@@ -5,7 +5,8 @@ import imageio
 import numpy as np
 import matplotlib.pyplot as plt
 %matplotlib inline
-
+import glob
+import os
 from coastcam_funcs import json2dict
 from calibration_crs import *
 from rectifier_crs import *
@@ -13,7 +14,7 @@ from rectifier_crs import *
 from joblib import Parallel, delayed
 
 # %%
-camera = 'both'
+camera = 'c1'
 
 extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/extrinsic_c1.json',
                        '/Users/dnowacki/Projects/ak/py/extrinsic_c2.json',]
@@ -60,7 +61,7 @@ print(calibration.local_extrinsics)
 xmin = 10
 xmax = 200
 ymin = -200
-ymax = 25
+ymax = 5 # was 25
 dx = 0.1
 dy = 0.1
 z = 1.5
@@ -77,39 +78,20 @@ rectifier = Rectifier(rectifier_grid)
 
 def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t):
     print(t)
-    fildir = '/Volumes/Backstaff/field/bti/untitled folder/'
-    if 'both' in t:
-        image_files = [fildir + 'c1/' + t[:-5] + '.c1.snap.jpg', fildir + 'c2/' + t[:-5] + '.c2.snap.jpg']
-    elif 'c1' in t:
-        image_files = [fildir + 'c1/' + t + '.snap.jpg']
-    elif 'c2' in t:
-        image_files = [fildir + 'c2/' + t + '.snap.jpg']
+    fildir = '/Volumes/Backstaff/field/bti/'
+    if camera is 'both':
+        image_files = [fildir + 'products/' + t + '.c1.snap.jpg',
+                       fildir + 'products/' + t + '.c2.snap.jpg']
+    else:
+        image_files = [fildir + 'products/' + t + '.' + camera + '.snap.jpg']
     rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
-    ofile = t + '_rect.png'
+    ofile = fildir + 'proc/rect/' + t + '.' + camera + '.snap.rect.png'
     imageio.imwrite(ofile,np.flip(rectified_image,0),format='png', optimize=True)
 
-ts = ['1531164600',
-      '1531166400',
-      '1531168200',
-      '1531170000',
-      '1531171800',
-      '1531173600',
-      '1531175400',
-      '1531177200',
-      '1531179000',
-      '1531180800',
-      '1531182600',
-      '1531184400',
-      '1531186200',
-      '1531188000',
-      '1531189800',
-      '1531191600',
-      '1531193400',
-      '1531195200',
-      '1531197000',
-      '1531198800',
-      '1531200600',]
+
+ts =[os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/bti/products/*c1.snap.jpg')]
+ts[0:100]
 
 # %%
 print(camera)
-Parallel(n_jobs=4, backend='multiprocessing')(delayed(lazyrun)(metadata, intrinsics_list, extrinsics_list, local_origin, t + '.' + camera) for t in ts)
+Parallel(n_jobs=4, backend='multiprocessing')(delayed(lazyrun)(metadata, intrinsics_list, extrinsics_list, local_origin, t) for t in ts)
