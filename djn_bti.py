@@ -1,10 +1,10 @@
-%load_ext autoreload
-%autoreload 2
+# %load_ext autoreload
+# %autoreload 2
 from pathlib import Path
 import imageio
 import numpy as np
 import matplotlib.pyplot as plt
-%matplotlib inline
+# %matplotlib inline
 import glob
 import os
 from coastcam_funcs import json2dict
@@ -14,7 +14,7 @@ from rectifier_crs import *
 from joblib import Parallel, delayed
 
 # %%
-camera = 'c1'
+camera = 'c2'
 
 extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/extrinsic_c1.json',
                        '/Users/dnowacki/Projects/ak/py/extrinsic_c2.json',]
@@ -88,10 +88,17 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t):
     ofile = fildir + 'proc/rect/' + t + '.' + camera + '.snap.rect.png'
     imageio.imwrite(ofile,np.flip(rectified_image,0),format='png', optimize=True)
 
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/bti/products/*c1.snap.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/bti/products/*c2.snap.jpg')]
 
-ts =[os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/bti/products/*c1.snap.jpg')]
-ts[0:100]
+if camera is 'c1':
+    ts = ts1
+elif camera is 'c2':
+    ts = ts2
+elif camera is 'both':
+    ts = list(set(ts1) & set(ts2))
 
 # %%
 print(camera)
-Parallel(n_jobs=4, backend='multiprocessing')(delayed(lazyrun)(metadata, intrinsics_list, extrinsics_list, local_origin, t) for t in ts)
+
+Parallel(n_jobs=8, backend='multiprocessing')(delayed(lazyrun)(metadata, intrinsics_list, extrinsics_list, local_origin, t) for t in ts)
