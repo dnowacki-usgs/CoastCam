@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 # %matplotlib inline
 import glob
 import os
+import shutil
+import skimage.io
+from skimage.exposure import match_histograms
 from coastcam_funcs import json2dict
 from calibration_crs import *
 from rectifier_crs import *
@@ -16,7 +19,8 @@ from rectifier_crs import *
 from joblib import Parallel, delayed
 
 # %%
-camera = 'c2'
+camera = 'both'
+product = 'timex'
 
 extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/extrinsic_c1.json',
                        '/Users/dnowacki/Projects/ak/py/extrinsic_c2.json',]
@@ -82,16 +86,25 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t):
     print(t)
     fildir = '/Volumes/Backstaff/field/bti/'
     if camera is 'both':
-        image_files = [fildir + 'products/' + t + '.c1.snap.jpg',
-                       fildir + 'products/' + t + '.c2.snap.jpg']
+        image_files = [fildir + 'products/' + t + '.c1.' + product + '.jpg',
+                       fildir + 'products/' + t + '.c2.' + product + '.jpg']
+        # print(image_files)
+        c1ref = skimage.io.imread(image_files[0])
+        c2src = skimage.io.imread(image_files[1])
+        # c2matched = match_histograms(c2src, c1ref, multichannel=True)
     else:
-        image_files = [fildir + 'products/' + t + '.' + camera + '.snap.jpg']
-    rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
-    ofile = fildir + 'proc/rect/' + t + '.' + camera + '.snap.rect.png'
-    imageio.imwrite(ofile,np.flip(rectified_image,0),format='png', optimize=True)
+        image_files = [fildir + 'products/' + t + '.' + camera + '.' + product + '.jpg']
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/bti/products/*c1.snap.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/bti/products/*c2.snap.jpg')]
+    rectified_image = rectifier.rectify_images(metadata, [c1ref, c2src], intrinsics_list, extrinsics_list, local_origin)
+    ofile = fildir + 'proc/rect/' + t + '.' + camera + '.' + product + '.rect.png'
+    imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
+
+    # rectified_image_matched = rectifier.rectify_images(metadata, [c1ref, c2matched], intrinsics_list, extrinsics_list, local_origin)
+    # ofile = fildir + 'proc/rect/' + t + '.' + camera + '.' + product + '.rect.matched.png'
+    # imageio.imwrite(ofile, np.flip(rectified_image_matched, 0), format='png', optimize=True)
+
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/bti/products/*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/bti/products/*c2.' + product + '.jpg')]
 
 if camera is 'c1':
     ts = ts1
@@ -103,4 +116,5 @@ elif camera is 'both':
 # %%
 print(camera)
 
-Parallel(n_jobs=8, backend='multiprocessing')(delayed(lazyrun)(metadata, intrinsics_list, extrinsics_list, local_origin, t) for t in ts)
+Parallel(n_jobs=4, backend='multiprocessing')(delayed(lazyrun)(metadata, intrinsics_list, extrinsics_list, local_origin, t) for t in ts)
+# [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t) for t in ts]

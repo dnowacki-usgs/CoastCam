@@ -279,11 +279,12 @@ class Rectifier(object):
 #            progress_callback(int((pct_base + 1) / total_steps * 100))
 
             # load image and apply weights to pixels
-            if fs:
-                with fs.open(image_file) as f:
-                    image = imageio.imread(f)
-            else:
-                image = imageio.imread(image_file)
+            # if fs:
+            #     with fs.open(image_file) as f:
+            #         image = imageio.imread(f)
+            # else:
+            #     image = imageio.imread(image_file)
+            image = image_file
             print(np.shape(image),print(np.shape(V)))
             K = self.get_pixels(U, V, image)
             print("back from get_pixels")
