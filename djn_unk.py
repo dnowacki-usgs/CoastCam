@@ -98,7 +98,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         image_files = [fildir + 'products/' + t + '.' + camera + '.' + product + '.jpg']
 
     rectified_image = rectifier.rectify_images(metadata, [c1ref, c2src], intrinsics_list, extrinsics_list, local_origin)
-    ofile = fildir + 'proc/rect/' + t + '.' + camera + '.' + product + '.rect.png'
+    ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.rect.png'
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
 
     # rectified_image_matched = rectifier.rectify_images(metadata, [c1ref, c2matched], intrinsics_list, extrinsics_list, local_origin)
@@ -119,14 +119,20 @@ elif camera is 'both':
 #     for item in ts:
 #         f.write(f"{item}\n")
 
-with open('/Users/dnowacki/Downloads/needs_processing.txt') as f:
-    ts = [line.rstrip() for line in f]
-
+with open('/Volumes/Backstaff/field/unk/proc/rect/' + product + '/done.txt') as f:
+    tsdone = [line.rstrip().split('.')[0] for line in f]
+# this will get what remains to be done
+print(len(ts))
+print(len(tsdone))
+print(set(ts) == set(tsdone))
+ts = set(ts) ^ set(tsdone)
+print('***', len(ts))
 # %%
 print(camera)
 # t = ts[0]
 # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values
 Parallel(n_jobs=4, backend='multiprocessing')(
     delayed(lazyrun)(
-        metadata, intrinsics_list, extrinsics_list, local_origin, t, n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts)
+        metadata, intrinsics_list, extrinsics_list, local_origin, t,
+        n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts)
 # [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts[0:2]]
