@@ -88,8 +88,8 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
     fildir = '/Volumes/Backstaff/field/unk/'
     if camera is 'both':
-        image_files = [fildir + 'products/' + t + '.c1.' + product + '.jpg',
-                       fildir + 'products/' + t + '.c2.' + product + '.jpg']
+        image_files = [fildir + 'products/2020/' + t + '.c1.' + product + '.jpg',
+                       fildir + 'products/2020/' + t + '.c2.' + product + '.jpg']
         # print(image_files)
         c1ref = skimage.io.imread(image_files[0])
         c2src = skimage.io.imread(image_files[1])
@@ -105,8 +105,11 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     # ofile = fildir + 'proc/rect/' + t + '.' + camera + '.' + product + '.rect.matched.png'
     # imageio.imwrite(ofile, np.flip(rectified_image_matched, 0), format='png', optimize=True)
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/*c2.' + product + '.jpg')]
+# ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c1.'+ product + '.jpg')]
+# ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c2.' + product + '.jpg')]
+
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/2020/*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/2020/*c2.' + product + '.jpg')]
 
 if camera is 'c1':
     ts = ts1
@@ -121,14 +124,25 @@ elif camera is 'both':
 
 with open('/Volumes/Backstaff/field/unk/proc/rect/' + product + '/done.txt') as f:
     tsdone = [line.rstrip().split('.')[0] for line in f]
-# this will get what remains to be done
-print(len(ts))
-print(len(tsdone))
+# # this will get what remains to be done
+print('length of ts', len(ts))
+print('length of the done list', len(tsdone))
 print(set(ts) == set(tsdone))
-ts = set(ts) ^ set(tsdone)
-print('***', len(ts))
+
+# ts = set(ts) ^ set(tsdone)
+set(ts)
 # %%
-print(camera)
+tsnew = []
+for n in ts:
+    if n not in tsdone:
+        tsnew.append(n)
+print('values in t not already in the done list', len(tsnew))
+ts = tsnew
+
+print('***', len(ts))
+print(product, camera)
+# %%
+print(product, camera)
 # t = ts[0]
 # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values
 Parallel(n_jobs=4, backend='multiprocessing')(
