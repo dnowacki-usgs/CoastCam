@@ -22,7 +22,7 @@ import xarray as xr
 
 # %%
 camera = 'both'
-product = 'timex'
+product = 'snap'
 
 extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/brw_extrinsic_c1.json',
                        '/Users/dnowacki/Projects/ak/py/brw_extrinsic_c2.json',]
