@@ -21,7 +21,7 @@ import xarray as xr
 n9468333 = xr.load_dataset('/Volumes/Backstaff/field/unk/n9468333.nc')
 
 # %%
-camera = 'both'
+camera = 'cx'
 product = 'timex'
 
 extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/unk_extrinsic_c1.json',
@@ -40,11 +40,11 @@ metadata= {'name': 'UNK',
 # read cal files and make lists of cal dicts
 extrinsics_list = []
 for f in extrinsic_cal_files:
-    if camera in f or camera is 'both':
+    if camera in f or camera is 'cx':
         extrinsics_list.append( json2dict(f) )
 intrinsics_list = []
 for f in intrinsic_cal_files:
-    if camera in f or camera is 'both':
+    if camera in f or camera is 'cx':
         intrinsics_list.append( json2dict(f) )
 print(extrinsics_list)
 print(intrinsics_list)
@@ -67,6 +67,9 @@ print(calibration.local_extrinsics)
 
 def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     print(t)
+    if np.isnan(z):
+        print('*** NaN detected in Z; skipping ***')
+        return
     """ coordinate system setup"""
     xmin = 0
     xmax = 250
@@ -87,9 +90,9 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     rectifier = Rectifier(rectifier_grid)
 
     fildir = '/Volumes/Backstaff/field/unk/'
-    if camera is 'both':
-        image_files = [fildir + 'products/2020/' + t + '.c1.' + product + '.jpg',
-                       fildir + 'products/2020/' + t + '.c2.' + product + '.jpg']
+    if camera is 'cx':
+        image_files = [fildir + 'products/' + t + '.c1.' + product + '.jpg',
+                       fildir + 'products/' + t + '.c2.' + product + '.jpg']
         # print(image_files)
         c1ref = skimage.io.imread(image_files[0])
         c2src = skimage.io.imread(image_files[1])
@@ -98,7 +101,8 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         image_files = [fildir + 'products/' + t + '.' + camera + '.' + product + '.jpg']
 
     rectified_image = rectifier.rectify_images(metadata, [c1ref, c2src], intrinsics_list, extrinsics_list, local_origin)
-    ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.rect.png'
+    ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
+    print(ofile)
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
 
     # rectified_image_matched = rectifier.rectify_images(metadata, [c1ref, c2matched], intrinsics_list, extrinsics_list, local_origin)
@@ -108,14 +112,14 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 # ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c1.'+ product + '.jpg')]
 # ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c2.' + product + '.jpg')]
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/2020/*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/2020/*c2.' + product + '.jpg')]
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/*c2.' + product + '.jpg')]
 
 if camera is 'c1':
     ts = ts1
 elif camera is 'c2':
     ts = ts2
-elif camera is 'both':
+elif camera is 'cx':
     ts = list(set(ts1) & set(ts2))
 
 # with open('/Users/dnowacki/Downloads/source_times.txt', 'w') as f:
@@ -132,6 +136,7 @@ print(set(ts) == set(tsdone))
 # ts = set(ts) ^ set(tsdone)
 set(ts)
 # %%
+print(len(ts))
 tsnew = []
 for n in ts:
     if n not in tsdone:
@@ -143,6 +148,7 @@ print('***', len(ts))
 print(product, camera)
 # %%
 print(product, camera)
+
 # t = ts[0]
 # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values
 Parallel(n_jobs=4, backend='multiprocessing')(
@@ -150,3 +156,6 @@ Parallel(n_jobs=4, backend='multiprocessing')(
         metadata, intrinsics_list, extrinsics_list, local_origin, t,
         n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts)
 # [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts[0:2]]
+# %%
+plt.plot(pd.to_datetime([x.split('/')[-1].split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/proc/rect/' + product + '/*png')], unit='s'),
+         marker='*')
