@@ -19,7 +19,7 @@ from rectifier_crs import *
 from joblib import Parallel, delayed
 
 # %%
-camera = 'both'
+camera = 'cx'
 product = 'timex'
 
 extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/extrinsic_c1.json',
@@ -38,11 +38,11 @@ metadata= {'name': 'BTI',
 # read cal files and make lists of cal dicts
 extrinsics_list = []
 for f in extrinsic_cal_files:
-    if camera in f or camera is 'both':
+    if camera in f or camera is 'cx':
         extrinsics_list.append( json2dict(f) )
 intrinsics_list = []
 for f in intrinsic_cal_files:
-    if camera in f or camera is 'both':
+    if camera in f or camera is 'cx':
         intrinsics_list.append( json2dict(f) )
 print(extrinsics_list)
 print(intrinsics_list)
@@ -85,7 +85,7 @@ rectifier = Rectifier(rectifier_grid)
 def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t):
     print(t)
     fildir = '/Volumes/Backstaff/field/bti/'
-    if camera is 'both':
+    if camera is 'cx':
         image_files = [fildir + 'products/' + t + '.c1.' + product + '.jpg',
                        fildir + 'products/' + t + '.c2.' + product + '.jpg']
         # print(image_files)
@@ -96,7 +96,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t):
         image_files = [fildir + 'products/' + t + '.' + camera + '.' + product + '.jpg']
 
     rectified_image = rectifier.rectify_images(metadata, [c1ref, c2src], intrinsics_list, extrinsics_list, local_origin)
-    ofile = fildir + 'proc/rect/' + t + '.' + camera + '.' + product + '.rect.png'
+    ofile = fildir + 'proc/rect/' + t + '.' + camera + '.' + product + '.png'
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
 
     # rectified_image_matched = rectifier.rectify_images(metadata, [c1ref, c2matched], intrinsics_list, extrinsics_list, local_origin)
@@ -110,7 +110,7 @@ if camera is 'c1':
     ts = ts1
 elif camera is 'c2':
     ts = ts2
-elif camera is 'both':
+elif camera is 'cx':
     ts = list(set(ts1) & set(ts2))
 
 # %%
