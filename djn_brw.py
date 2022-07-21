@@ -40,11 +40,11 @@ metadata= {'name': 'Utqiagvik',
 # read cal files and make lists of cal dicts
 extrinsics_list = []
 for f in extrinsic_cal_files:
-    if camera in f or camera is 'both':
+    if camera in f or camera == 'cx':
         extrinsics_list.append( json2dict(f) )
 intrinsics_list = []
 for f in intrinsic_cal_files:
-    if camera in f or camera is 'both':
+    if camera in f or camera == 'cx':
         intrinsics_list.append( json2dict(f) )
 print(extrinsics_list)
 print(intrinsics_list)
@@ -87,7 +87,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     rectifier = Rectifier(rectifier_grid)
 
     fildir = '/Volumes/Backstaff/field/brw/'
-    if camera is 'both':
+    if camera == 'cx':
         image_files = [fildir + 'products/' + t + '.c1.' + product + '.jpg',
                        fildir + 'products/' + t + '.c2.' + product + '.jpg']
         # print(image_files)
@@ -111,11 +111,11 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/brw/products/*c1.'+ product + '.jpg')]
 ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/brw/products/*c2.' + product + '.jpg')]
 
-if camera is 'c1':
+if camera == 'c1':
     ts = ts1
-elif camera is 'c2':
+elif camera == 'c2':
     ts = ts2
-elif camera is 'both':
+elif camera == 'cx':
     ts = list(set(ts1) & set(ts2))
 
 ts  = [x for x in ts if int(x) >= 1630294200 ] # only good images from when the camera was aimed correctly
