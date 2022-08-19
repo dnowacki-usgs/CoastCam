@@ -21,7 +21,7 @@ import xarray as xr
 
 
 # %%
-camera = 'both'
+camera = 'cx'
 product = 'snap'
 
 extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/brw_extrinsic_c1.json',
@@ -148,7 +148,7 @@ print(product, camera)
 print(product, camera)
 # t = ts[0]
 # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values
-Parallel(n_jobs=4, backend='multiprocessing')(
+Parallel(n_jobs=16)(
     delayed(lazyrun)(
         metadata, intrinsics_list, extrinsics_list, local_origin, t,
         1) # set z to 1, which is the approx water elevation from the beach survey
