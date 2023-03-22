@@ -89,7 +89,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
     rectifier = Rectifier(rectifier_grid)
 
-    fildir = '/Volumes/Backstaff/field/unk/'
+    fildir = '/Volumes/Argus/unk/'
     if camera == 'cx':
         image_files = [fildir + 'products/' + t + '.c1.' + product + '.jpg',
                        fildir + 'products/' + t + '.c2.' + product + '.jpg']
@@ -112,8 +112,8 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 # ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c1.'+ product + '.jpg')]
 # ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c2.' + product + '.jpg')]
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/*c2.' + product + '.jpg')]
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Argus/unk/products/*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Argus/unk/products/*c2.' + product + '.jpg')]
 
 if camera == 'c1':
     ts = ts1
@@ -122,19 +122,26 @@ elif camera == 'c2':
 elif camera == 'cx':
     ts = list(set(ts1) & set(ts2))
 
-# with open('/Users/dnowacki/Downloads/source_times.txt', 'w') as f:
-#     for item in ts:
-#         f.write(f"{item}\n")
 
-with open('/Volumes/Backstaff/field/unk/proc/rect/' + product + '/done.txt') as f:
-    tsdone = [line.rstrip().split('.')[0] for line in f]
+with open('/Volumes/Argus/unk/proc/rect/' + product + '/done.txt', 'w') as f:
+    for g in glob.glob('/Volumes/Argus/unk/proc/rect/' + product + '/*png'):
+        f.write(f"{g.split('/')[-1].split('.')[0]}\n")
+    for g in glob.glob('/Volumes/Argus/unk/proc/rect/' + product + '/dark/*png'):
+        f.write(f"{g.split('/')[-1].split('.')[0]}\n")
+
+with open('/Volumes/Argus/unk/proc/rect/' + product + '/done.txt') as f:
+    tsdone = [line.rstrip() for line in f]
+
 # # this will get what remains to be done
 print('length of ts', len(ts))
 print('length of the done list', len(tsdone))
 print(set(ts) == set(tsdone))
+len(set(tsdone))
+# ts = set(ts) ^ set(tsdone)
+# print('length of the todo list', len(ts))
 
 # ts = set(ts) ^ set(tsdone)
-set(ts)
+# set(ts)
 # %%
 print(len(ts))
 tsnew = []
