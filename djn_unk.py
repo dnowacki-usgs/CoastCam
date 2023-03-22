@@ -19,10 +19,10 @@ import pandas as pd
 from joblib import Parallel, delayed
 import xarray as xr
 n9468333 = xr.load_dataset('/Volumes/Backstaff/field/unk/n9468333.nc')
-
+import multiprocess as mp
 # %%
 camera = 'cx'
-product = 'timex'
+product = 'dark'
 
 extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/unk_extrinsic_c1.json',
                        '/Users/dnowacki/Projects/ak/py/unk_extrinsic_c2.json',]
@@ -66,6 +66,7 @@ print(calibration.world_extrinsics)
 print(calibration.local_extrinsics)
 
 def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
+    # metadata, intrinsics_list, extrinsics_list, local_origin, t, z = inputs
     print(t)
     if np.isnan(z):
         print('*** NaN detected in Z; skipping ***')
@@ -94,8 +95,12 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         image_files = [fildir + 'products/' + t + '.c1.' + product + '.jpg',
                        fildir + 'products/' + t + '.c2.' + product + '.jpg']
         # print(image_files)
-        c1ref = skimage.io.imread(image_files[0])
-        c2src = skimage.io.imread(image_files[1])
+        try:
+            c1ref = skimage.io.imread(image_files[0])
+            c2src = skimage.io.imread(image_files[1])
+        except AttributeError:
+            print('could not process', image_files[0], image_files[1], 'skipping')
+            return
         # c2matched = match_histograms(c2src, c1ref, multichannel=True)
     else:
         image_files = [fildir + 'products/' + t + '.' + camera + '.' + product + '.jpg']
@@ -158,10 +163,34 @@ print(product, camera)
 
 # t = ts[0]
 # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values
-Parallel(n_jobs=4, backend='multiprocessing')(
+
+# Parallel(n_jobs=16)(
+#     delayed(lazyrun)(
+#         metadata, intrinsics_list, extrinsics_list, local_origin, t,
+#         n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts)
+
+ds = xr.Dataset()
+ds['time'] = xr.DataArray(pd.to_datetime(ts, unit='s'), dims='time')
+ds['timestamp'] = xr.DataArray(ts, dims='time')
+ds['wl'] = n9468333['v'].reindex_like(ds['time'], method='nearest', tolerance='10min')
+ds = ds.sortby('time')
+
+Parallel(n_jobs=8)(
     delayed(lazyrun)(
         metadata, intrinsics_list, extrinsics_list, local_origin, t,
-        n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts)
+        ds['wl'][ds.timestamp == t].values)
+        # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values)
+        for t in ts
+        #
+        )
+
+# with mp.Pool() as pool:
+#     result = pool.map(lazyrun, [(
+#         metadata, intrinsics_list, extrinsics_list, local_origin, t,
+#         n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts])
+# %%
+[lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values) for t in ts]
+
 # [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts[0:2]]
 # %%
 plt.plot(pd.to_datetime([x.split('/')[-1].split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/proc/rect/' + product + '/*png')], unit='s'),
