@@ -92,20 +92,51 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
     fildir = '/Volumes/Argus/unk/'
     if camera == 'cx':
+        c1bad = False
+        c2bad = False
         image_files = [fildir + 'products/' + t + '.c1.' + product + '.jpg',
                        fildir + 'products/' + t + '.c2.' + product + '.jpg']
         # print(image_files)
         try:
             c1ref = skimage.io.imread(image_files[0])
+        except AttributeError:
+            print('could not process', image_files[0], '; RETURNING')
+            return
+        except FileNotFoundError:
+            print('could not process', image_files[0], '; replacing with zeros')
+            c1ref = np.zeros((1536, 2048, 3), dtype=np.uint8)
+            c1bad = True
+
+        try:
             c2src = skimage.io.imread(image_files[1])
         except AttributeError:
-            print('could not process', image_files[0], image_files[1], 'skipping')
+            print('could not process', image_files[1], '; RETURNING')
             return
+        except FileNotFoundError:
+            print('could not process', image_files[1], '; replacing with zeros')
+            c2src = np.zeros((1536, 2048, 3), dtype=np.uint8)
+            c2bad = True
+
         # c2matched = match_histograms(c2src, c1ref, multichannel=True)
     else:
         image_files = [fildir + 'products/' + t + '.' + camera + '.' + product + '.jpg']
 
-    rectified_image = rectifier.rectify_images(metadata, [c1ref, c2src], intrinsics_list, extrinsics_list, local_origin)
+    print(f"{c1bad=}, {c2bad=}")
+
+    if c1bad:
+        inimg = [c2src]
+        intrinsics_list = [intrinsics_list[1]]
+        extrinsics_list = [extrinsics_list[1]]
+    elif c2bad:
+        inimg = [c1ref]
+        intrinsics_list = [intrinsics_list[0]]
+        extrinsics_list = [extrinsics_list[0]]
+    elif not c1bad and not c2bad:
+        inimg = [c1ref, c2src]
+    else:
+        raise ValueError('no images')
+
+    rectified_image = rectifier.rectify_images(metadata, inimg, intrinsics_list, extrinsics_list, local_origin)
     ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
     print(ofile)
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
@@ -117,27 +148,27 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 # ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c1.'+ product + '.jpg')]
 # ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c2.' + product + '.jpg')]
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Argus/unk/products/*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Argus/unk/products/*c2.' + product + '.jpg')]
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/*c2.' + product + '.jpg')]
 
 if camera == 'c1':
     ts = ts1
 elif camera == 'c2':
     ts = ts2
 elif camera == 'cx':
-    ts = list(set(ts1) & set(ts2))
+    ts = list(set(ts1) | set(ts2)) # use OR instead of AND so we can have rectified images when just one camera was active
 
 
-with open('/Volumes/Argus/unk/proc/rect/' + product + '/done.txt', 'w') as f:
-    for g in glob.glob('/Volumes/Argus/unk/proc/rect/' + product + '/*png'):
+with open(fildir + 'proc/rect/' + product + '/done.txt', 'w') as f:
+    for g in glob.glob(fildir + 'proc/rect/' + product + '/*png'):
         f.write(f"{g.split('/')[-1].split('.')[0]}\n")
-    for g in glob.glob('/Volumes/Argus/unk/proc/rect/' + product + '/dark/*png'):
+    for g in glob.glob(fildir + 'proc/rect/' + product + '/dark/*png'):
         f.write(f"{g.split('/')[-1].split('.')[0]}\n")
 
-with open('/Volumes/Argus/unk/proc/rect/' + product + '/done.txt') as f:
+with open(fildir + 'proc/rect/' + product + '/done.txt') as f:
     tsdone = [line.rstrip() for line in f]
 
-# # this will get what remains to be done
+# this will get what remains to be done
 print('length of ts', len(ts))
 print('length of the done list', len(tsdone))
 print(set(ts) == set(tsdone))
@@ -147,7 +178,7 @@ len(set(tsdone))
 
 # ts = set(ts) ^ set(tsdone)
 # set(ts)
-# %%
+# %
 print(len(ts))
 tsnew = []
 for n in ts:
@@ -160,14 +191,8 @@ print('***', len(ts))
 print(product, camera)
 # %%
 print(product, camera)
-
 # t = ts[0]
 # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values
-
-# Parallel(n_jobs=16)(
-#     delayed(lazyrun)(
-#         metadata, intrinsics_list, extrinsics_list, local_origin, t,
-#         n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts)
 
 ds = xr.Dataset()
 ds['time'] = xr.DataArray(pd.to_datetime(ts, unit='s'), dims='time')
@@ -175,13 +200,11 @@ ds['timestamp'] = xr.DataArray(ts, dims='time')
 ds['wl'] = n9468333['v'].reindex_like(ds['time'], method='nearest', tolerance='10min')
 ds = ds.sortby('time')
 
-Parallel(n_jobs=8)(
+Parallel(n_jobs=12)(
     delayed(lazyrun)(
         metadata, intrinsics_list, extrinsics_list, local_origin, t,
         ds['wl'][ds.timestamp == t].values)
-        # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values)
         for t in ts
-        #
         )
 
 # with mp.Pool() as pool:
