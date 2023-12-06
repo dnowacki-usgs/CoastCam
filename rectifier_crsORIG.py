@@ -4,21 +4,24 @@ from scipy.interpolate import RectBivariateSpline, RegularGridInterpolator
 from scipy.ndimage.morphology import distance_transform_edt
 
 from calibration_crs import CameraCalibration #CRS
-import skimage
+
 
 class TargetGrid(object):
     """Grid generated to georectify image.
+
     CRS modified to make endpoints inclusive
     Notes:
         - Used to maps points in world coordinates to pixels
         - The limits should be specified in local coordinates using the same
           coordinates and units as camera calibrations.
+
     Args:
         xlims (ndarray) - min and max (inclusive) in the x-direction (e.g. [-50, 650])
         ylims (ndarray) - min and max (inclusive) in the y-direction (e.g. [0, 2501])
         dx (float) - resolution of grid in x direction (same units as camera calibration)
         dy (float) - resolution of grid in y direction (same units as camera calibration)
         z (float) - static value to estimate elevation at everypoint in the x, y grid
+
     Attributes:
         X (np.ndarray): Local grid coordinates in x-direction.
         Y (np.ndarray): Local grid coordinates in y-direction.
@@ -41,8 +44,10 @@ class TargetGrid(object):
 
 class Rectifier(object):
     """Georectifies an oblique image given RectifierGrid and ncolors.
+
     Note:
         Derived from example code for georectifying mini-Argus imagery.
+
     Attributes:
         target_grid (TargetGrid): Params and grid used to create georectified image.
         camera_calibration (CameraCalibration): CameraCalibration including intrinsic (LCP) and extrinsic (Beta) coefficients.
@@ -131,20 +136,19 @@ class Rectifier(object):
         UV = np.matmul(calibration.P, xyz)
         xyzC = np.matmul(calibration.R,np.matmul(calibration.IC,xyz))
         flag[np.where(xyzC[2,:]<=0.)]=0.
-        flag = flag.reshape(self.target_grid.X.shape, order='F')
 
-        # apply the flag to zero-out non-valid points
-        return DU*flag, DV*flag, flag
+        # TODO - These flags are not applied
 
-    def get_pixels(self, DU, DV, image, interp_method='rgi'):
+        return DU, DV, flag
+
+    def get_pixels(self, DU, DV, image):
         """Return pixel values for each xyz point from the image
+
         Arguments:
             DU (np.ndarray): Pixel location in camera orientation and coordinate system
             DV (np.ndarray): Pixel location in cmaera orientation and coorindate system
-            image (np.ndarray [nx,ny,nc]) with RGB values at U,V points
-            interp_method (string):
-                'rgi' - uses SciPy RegularGridInterpolator (linear, about 5x faster)
-                'rbs' - use SciPy RectBivariateSpline (smoother?)
+            image (np.ndarray [nx,ny,nc]) with RGB values at U,V points.
+
         Returns:
             K (np.ndarray): Pixel intensity for each point in the image
         """
@@ -154,10 +158,11 @@ class Rectifier(object):
             self.ncolors
         ))
 
-        # Having tested both interpolation routines, the rgi is about five times
+        # Having tested both interpolation routines, the rgi is about five rectify_images
         # faster, no visual difference, but that has not been checked quantitatively.
-        if interp_method == 'rbs':
+        if False:
             for c, _ in enumerate(['r', 'b', 'g']):
+                print("c=",c)
                 rbs = RectBivariateSpline(
                     # use this range to match matlab exactly
                     np.arange(1, image.shape[0] + 1),
@@ -167,7 +172,7 @@ class Rectifier(object):
                     ky=1
                 )
                 K[:, :, c] = rbs.ev(DV, DU)
-        elif interp_method == 'rgi':
+        else:
             for c, _ in enumerate(['r', 'b', 'g']):
                 rgi = RegularGridInterpolator(
                     (np.arange(0, image.shape[0]),
@@ -177,11 +182,8 @@ class Rectifier(object):
                     bounds_error=False,
                     fill_value=np.nan)
                 K[:, :, c] = rgi((DV,DU))
-        else:
-            #TODO - what is the proper way to handle this error?
-            print('No valid interp method')
 
-        # mask out values out of range like Matlab
+        # mask out values out of range like matlab
         # avoid runtime nan comparison warning (DU, DV already have nans)
         with np.errstate(invalid='ignore'):
             mask_u = np.logical_or(
@@ -201,11 +203,14 @@ class Rectifier(object):
 
     def assemble_image_weights(self, K):
         """Return weight matrix W used for image merging.
+
         Notes:
             - Calculates Euclidean distance for each entry to nearest non-zero pixel value
             - edt: Euclidean Distance Transform
+
         Arguments:
             K (np.ndarray): Pixel intensity
+
         Returns:
             W (np.ndarray): Pixel weights used for merging images
         """
@@ -214,82 +219,91 @@ class Rectifier(object):
         # so, find the nans, then invert so it works with the function
         W = distance_transform_edt(~np.isnan(K[:, :, 0]))
 
-        # Not sure when this would happen, but included because it's in the MATLAB code
+        # Not sure when this would happend, but I'm including it because it's in the MATLAB code
         if np.isinf(np.max(W)):
             W[:] = 1
+
         W = W / np.max(W)
+        W[W == 0] = np.nan
+
         return W
 
     def apply_weights_to_pixels(self, K, W):
         """Return pixel intensities (K) weighted by W.
+
         Arguments:
             K (np.ndarray): Pixel intensity
             W (np.ndarray): Pixel weights used for merging images
+
         Returns:
             K_weighted(np.ndarray): Pixel intensity weighted for merging
         """
         W_nonan = W.copy()
+        W_nonan[np.isnan(W_nonan)] = 0
         K_weighted = K*W_nonan[:, :, np.newaxis]
+
         return K_weighted
 
-    def rectify_images(self, metadata, image_files, intrinsic_cal_list, extrinsic_cal_list, local_origin, fs=None, interp_method = 'rgi'):
-        """Georectify and blend images from multiple cameras
+    def rectify_images(self, metadata, image_files, intrinsic_cal_list, extrinsic_cal_list, local_origin, progress_callback=None, fs=None):
+        """Given list of image paths from N cameras, return a georectified image (ndarray)
+
         Arguments:
-            metadata (dict):
-            image_files (list): List of image files
-            intrinsic_cal_list (list): list of paths to internal calibrations (one for each camera)
-            extrinsic_cal_list (list): list of paths to external calibrations (one for each camera)
-            local_origin:
-            fs: (object): fsspec file spec object for folder on S3 bucket. If none, normal file system will be used.
-            interp_method: (string): either 'rbs' (rectilinear bicubic spline) or 'rgi' (regular grid interpolator: linear and faster)
+            image_files (list): List of image files.
             camera_calibration_files (list): List of calibrations for cameras used to get image_files.
+            progress_callback (callable): Optional; callable taking one parameter, an integer of progress 0-100
+
         Returns:
             M (np.ndarray): Georectified images merged from supplied images.
         """
-        # array for final pixel values
         M = np.tile(
             np.zeros_like(self.target_grid.X[:, :, np.newaxis]),
             (self.ncolors,)
         )
-        # array for weights
         totalW = M.copy()
 
+        total_pairs = len(image_files)
+        steps_per_pair = 3
+        total_steps = total_pairs * steps_per_pair
+        # if progress_callback is None:
+        #     progress_callback = lambda x: x
+
         for cur_idx, (image_file, intrinsic_cal, extrinsic_cal) in enumerate(zip(image_files, intrinsic_cal_list, extrinsic_cal_list)):
-            #  print("loop",cur_idx,"calibrations:")
-            #  print(intrinsic_cal, extrinsic_cal)
+            pct_base = cur_idx * steps_per_pair
+            print("loop",cur_idx,"calibrations:")
+            print(intrinsic_cal, extrinsic_cal)
             # load camera calibration file and find pixel locations
             camera_calibration = CameraCalibration(metadata, intrinsic_cal, extrinsic_cal, local_origin)
+            print("back from CameraCalibration")
             U, V, flag = self._find_distort_UV(camera_calibration)
+            print("back from _find_distort_UV")
+#            progress_callback(int((pct_base + 1) / total_steps * 100))
 
             # load image and apply weights to pixels
-            if fs:
-                # using fsspec for S3 files
-                with fs.open(image_file) as f:
-                    image = imageio.imread(f)
-            else:
-                # regular file system
-                image = imageio.imread(image_file)
-                # DJN ADDED FOR GRAYSCALE IMAGES
-                if image.ndim == 2:
-                    image = skimage.color.gray2rgb(image)
-
-            K = self.get_pixels(U, V, image, interp_method=interp_method)
+            # if fs:
+            #     with fs.open(image_file) as f:
+            #         image = imageio.imread(f)
+            # else:
+            #     image = imageio.imread(image_file)
+            image = image_file
+            print(np.shape(image),print(np.shape(V)))
+            K = self.get_pixels(U, V, image)
+            print("back from get_pixels")
             W = self.assemble_image_weights(K)
+            print("back from assemble_image_weights")
             K_weighted = self.apply_weights_to_pixels(K, W)
+            print("back from apply_weights_to_pixles")
+            # progress_callback(int((pct_base + 2) / total_steps * 100))
 
             # add up weights and pixel itensities
+            W[np.isnan(W)] = 0
             totalW = totalW + W[:, :, np.newaxis]
             K_weighted[np.isnan(K_weighted)] = 0
             M = M + K_weighted
+
+            # progress_callback(int((pct_base + 3) / total_steps * 100))
 
         # stop divide by 0 warnings
         with np.errstate(invalid='ignore'):
             M = M / totalW
 
-        #TODO - is there any need to retain the NaNs, or is replacing by zero ok?
-        M[np.isnan(M)]=0
-
-        #TODO - don't need to return W, K or flag...they are from last image processed
-        # return M.astype(np.uint8), W, K, flag
-
-        return M.astype(np.uint8)
+        return M

@@ -3,19 +3,22 @@ from pathlib import Path
 
 import numpy as np
 import scipy.io
+from coastcam_funcs import local_transform_extrinsics
 
-from coastcam_funcs import *
 
 class CameraCalibration(object):
     """Camera calibration saved in .mat file and method to assemble Projective (P) martrix.
+
     Notes:
         - Inspired by example code + notes from CiRC which are derived from Hartley and Zisserman (20030.)
         - Asssumes calibration saved in .mat file
+
     Args:
         metadata
         extrinsics
         intrinsics
         local_origin
+
     Attributes:
         fname (str): Name of camera calibration file
         serial_number (int): Camera serial number
@@ -89,12 +92,14 @@ class CameraCalibration(object):
 
     def _assembleP(self):
         """Assembles and returns Projective (P) matrix from LCP and Beta values.
+
         Notes:
             - Derived from lcpBeta2P.m + CiRN notes
             - K converts angle away from the center of view into camera coordinates
             - R describes the 3D viewing direction of camera compared to world coordinates
             - beta[:3] camera location in world coordinates (x,y,z)
             - beta[3::] camera orientation (azimuth, tilt, roll) in radians
+
         Returns:
             P (np.ndarray): Projective matrix
         """
@@ -125,36 +130,36 @@ class CameraCalibration(object):
         return P, R, IC
 
 
-# def angle2R(azimuth, tilt, swing):
-#     """Assembles and returns a rotation matrix R from azimuth, tilt, and swing (roll)
+def angle2R(azimuth, tilt, swing):
+    """Assembles and returns a rotation matrix R from azimuth, tilt, and swing (roll)
 
-#     Notes:
-#         - derived from angles2R.m by Costal Imaging Research Network and Oregon State University
-#         - From p 612 of Wolf, 1983
+    Notes:
+        - derived from angles2R.m by Costal Imaging Research Network and Oregon State University
+        - From p 612 of Wolf, 1983
 
-#     Arguments:
-#         azimuth (float): Azimuth
-#         tilt (float): Tilt
-#         swith (float): swing
+    Arguments:
+        azimuth (float): Azimuth
+        tilt (float): Tilt
+        swith (float): swing
 
-#     Returns:
-#         R (np.ndarray): Rotation matrix
-#     """
-#     a = azimuth
-#     t = tilt
-#     s = swing
-#     R = np.zeros((3, 3))
+    Returns:
+        R (np.ndarray): Rotation matrix
+    """
+    a = azimuth
+    t = tilt
+    s = swing
+    R = np.zeros((3, 3))
 
-#     R[0, 0] = np.cos(a) * np.cos(s) + np.sin(a) * np.cos(t) * np.sin(s)
-#     R[0, 1] = -np.cos(s) * np.sin(a) + np.sin(s) * np.cos(t) * np.cos(a)
-#     R[0, 2] = np.sin(s) * np.sin(t)
+    R[0, 0] = np.cos(a) * np.cos(s) + np.sin(a) * np.cos(t) * np.sin(s)
+    R[0, 1] = -np.cos(s) * np.sin(a) + np.sin(s) * np.cos(t) * np.cos(a)
+    R[0, 2] = np.sin(s) * np.sin(t)
 
-#     R[1, 0] = -np.sin(s) * np.cos(a) + np.cos(s) * np.cos(t) * np.sin(a)
-#     R[1, 1] = np.sin(s) * np.sin(a) + np.cos(s) * np.cos(t) * np.cos(a)
-#     R[1, 2] = np.cos(s) * np.sin(t)
+    R[1, 0] = -np.sin(s) * np.cos(a) + np.cos(s) * np.cos(t) * np.sin(a)
+    R[1, 1] = np.sin(s) * np.sin(a) + np.cos(s) * np.cos(t) * np.cos(a)
+    R[1, 2] = np.cos(s) * np.sin(t)
 
-#     R[2, 0] = np.sin(t) * np.sin(a)
-#     R[2, 1] = np.sin(t) * np.cos(a)
-#     R[2, 2] = -np.cos(t)
+    R[2, 0] = np.sin(t) * np.sin(a)
+    R[2, 1] = np.sin(t) * np.cos(a)
+    R[2, 2] = -np.cos(t)
 
-#     return R
+    return R
