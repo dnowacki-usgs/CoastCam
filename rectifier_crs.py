@@ -170,8 +170,8 @@ class Rectifier(object):
         elif interp_method == 'rgi':
             for c, _ in enumerate(['r', 'b', 'g']):
                 rgi = RegularGridInterpolator(
-                    (np.arange(0, image.shape[0]),
-                     np.arange(0, image.shape[1])),
+                    (np.arange(1, image.shape[0]+1),
+                     np.arange(1, image.shape[1]+1)),
                     image[:,:,c],
                     method='linear',
                     bounds_error=False,
