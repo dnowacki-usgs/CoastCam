@@ -18,11 +18,15 @@ from rectifier_crs import *
 import pandas as pd
 from joblib import Parallel, delayed
 import xarray as xr
-n9468333 = xr.load_dataset('/Volumes/Backstaff/field/unk/n9468333.nc')
+from tqdm import tqdm
+n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
 import multiprocess as mp
+
+
 # %%
+fildir = '/Volumes/Argus/unk/'
 camera = 'cx'
-product = 'dark'
+product = 'snap'
 
 extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/unk_extrinsic_c1.json',
                        '/Users/dnowacki/Projects/ak/py/unk_extrinsic_c2.json',]
@@ -90,7 +94,6 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
     rectifier = Rectifier(rectifier_grid)
 
-    fildir = '/Volumes/Argus/unk/'
     if camera == 'cx':
         c1bad = False
         c2bad = False
@@ -99,7 +102,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         # print(image_files)
         try:
             c1ref = skimage.io.imread(image_files[0])
-        except AttributeError:
+        except (AttributeError, ValueError):
             print('could not process', image_files[0], '; RETURNING')
             return
         except FileNotFoundError:
@@ -109,7 +112,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
         try:
             c2src = skimage.io.imread(image_files[1])
-        except AttributeError:
+        except (AttributeError, ValueError):
             print('could not process', image_files[1], '; RETURNING')
             return
         except FileNotFoundError:
@@ -197,15 +200,22 @@ print(product, camera)
 ds = xr.Dataset()
 ds['time'] = xr.DataArray(pd.to_datetime(ts, unit='s'), dims='time')
 ds['timestamp'] = xr.DataArray(ts, dims='time')
-ds['wl'] = n9468333['v'].reindex_like(ds['time'], method='nearest', tolerance='10min')
+ds['wl'] = n9468333['water_level'].reindex_like(ds['time'], method='nearest', tolerance='10min')
 ds = ds.sortby('time')
 
-Parallel(n_jobs=12)(
-    delayed(lazyrun)(
-        metadata, intrinsics_list, extrinsics_list, local_origin, t,
-        ds['wl'][ds.timestamp == t].values)
-        for t in ts
-        )
+# Parallel(n_jobs=-4)(
+#     delayed(lazyrun)(
+#         metadata, intrinsics_list, extrinsics_list, local_origin, t,
+#         ds['wl'][ds.timestamp == t].values)
+#         for t in ts
+#         )
+def multi_run_wrapper(args):
+   return lazyrun(*args)
+
+tasks = [(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values) for t in ts]
+with mp.Pool(mp.cpu_count()-4) as pool:
+    for _ in tqdm(pool.imap_unordered(multi_run_wrapper, tasks), total=len(tasks)):
+        pass
 
 # with mp.Pool() as pool:
 #     result = pool.map(lazyrun, [(
