@@ -27,7 +27,7 @@ class TargetGrid(object):
     """
     def __init__(self, xlims, ylims, dx=1, dy=1, z=-0.91):
         x = np.arange(xlims[0], xlims[1]+dx, dx)
-        y = np.arange(ylims[0], ylims[1]+dx, dy)
+        y = np.arange(ylims[0], ylims[1]+dy, dy)
         self.X, self.Y = np.meshgrid(x, y)
         self.Z = np.zeros_like(self.X) + z
         self.xyz = self._xyz_grid()
