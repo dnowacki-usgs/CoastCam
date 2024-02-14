@@ -157,7 +157,7 @@ class Rectifier(object):
         # Having tested both interpolation routines, the rgi is about five times
         # faster, no visual difference, but that has not been checked quantitatively.
         if interp_method == 'rbs':
-            for c, _ in enumerate(['r', 'b', 'g']):
+            for c in range(self.ncolors):
                 rbs = RectBivariateSpline(
                     # use this range to match matlab exactly
                     np.arange(1, image.shape[0] + 1),
@@ -168,7 +168,7 @@ class Rectifier(object):
                 )
                 K[:, :, c] = rbs.ev(DV, DU)
         elif interp_method == 'rgi':
-            for c, _ in enumerate(['r', 'b', 'g']):
+            for c in range(self.ncolors):
                 rgi = RegularGridInterpolator(
                     (np.arange(1, image.shape[0]+1),
                      np.arange(1, image.shape[1]+1)),
