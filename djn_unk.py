@@ -1,27 +1,22 @@
 # %load_ext autoreload
 # %autoreload 2
-from pathlib import Path
 import imageio
 import numpy as np
 import glob
 import os
-import matplotlib.pyplot as plt
 # %matplotlib inline
-import glob
-import os
-import shutil
 import skimage.io
-from skimage.exposure import match_histograms
+import matplotlib.pyplot as plt
 from coastcam_funcs import json2dict
-from calibration_crs import *
-from rectifier_crs import *
+from calibration_crs import CameraCalibration
+from rectifier_crs import Rectifier, TargetGrid
 import pandas as pd
 from joblib import Parallel, delayed
 import xarray as xr
 from tqdm import tqdm
-n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
 import multiprocess as mp
 
+n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
 
 # %%
 fildir = '/Volumes/Argus/unk/'
