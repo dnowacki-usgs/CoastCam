@@ -60,17 +60,23 @@ print(calibration.local_extrinsics)
 
 def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     print(t)
+
+    if np.isnan(z):
+        print("No wl data for", pd.to_datetime(t, unit='s'))
+        return
     """ coordinate system setup"""
-    xmin = 0
-    xmax = 300
-    ymin = 0
-    ymax = 250
     if product == 'dark':
         dx = 0.1
         dy = 0.1
     else:
-        dx = 0.25
-        dy = 0.25
+        dx = 0.1
+        dy = 0.1
+
+    xmin = 0
+    xmax = 300-dx
+    ymin = 0
+    ymax = 250-dy
+
     # z = 0 # z is now defined by water level input
     print(f'***Z: {z} m NAVD88')
     rectifier_grid = TargetGrid(
