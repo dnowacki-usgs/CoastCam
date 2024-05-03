@@ -97,7 +97,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
             return
         except FileNotFoundError:
             print('could not process', image_files[0], '; replacing with zeros')
-            c1ref = np.zeros((1536, 2048, 3), dtype=np.uint8)
+            # c1ref = np.zeros((1536, 2048, 3), dtype=np.uint8)
             c1bad = True
 
         try:
@@ -107,7 +107,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
             return
         except FileNotFoundError:
             print('could not process', image_files[1], '; replacing with zeros')
-            c2src = np.zeros((1536, 2048, 3), dtype=np.uint8)
+            # c2src = np.zeros((1536, 2048, 3), dtype=np.uint8)
             c2bad = True
 
         # c2matched = match_histograms(c2src, c1ref, multichannel=True)
@@ -117,19 +117,13 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     print(f"{c1bad=}, {c2bad=}")
 
     if c1bad:
-        inimg = [c2src]
         intrinsics_list = [intrinsics_list[1]]
         extrinsics_list = [extrinsics_list[1]]
     elif c2bad:
-        inimg = [c1ref]
         intrinsics_list = [intrinsics_list[0]]
         extrinsics_list = [extrinsics_list[0]]
-    elif not c1bad and not c2bad:
-        inimg = [c1ref, c2src]
-    else:
-        raise ValueError('no images')
 
-    rectified_image = rectifier.rectify_images(metadata, inimg, intrinsics_list, extrinsics_list, local_origin)
+    rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
     ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
     print(ofile)
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
