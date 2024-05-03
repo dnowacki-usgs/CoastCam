@@ -1,20 +1,13 @@
 # %load_ext autoreload
 # %autoreload 2
-from pathlib import Path
 import imageio
 import numpy as np
 import glob
 import os
-import matplotlib.pyplot as plt
-# %matplotlib inline
-import glob
-import os
-import shutil
 import skimage.io
-from skimage.exposure import match_histograms
 from coastcam_funcs import json2dict
-from calibration_crs import *
-from rectifier_crs import *
+from calibration_crs import CameraCalibration
+from rectifier_crs import Rectifier, TargetGrid
 import pandas as pd
 from joblib import Parallel, delayed
 import xarray as xr
