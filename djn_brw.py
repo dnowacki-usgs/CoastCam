@@ -13,14 +13,25 @@ from joblib import Parallel, delayed
 import xarray as xr
 fildir = '/Volumes/Argus/brw/'
 
+
+# water level for 2021 data
+rbr = xr.load_dataset('/Users/dnowacki/Library/CloudStorage/OneDrive-DOI/Alaska/brw2021/rbr/041230_20211007_2113/wave_interval_512/brwrbrs-a.nc')
+# waterlevel during wave gauge deployment 1.25 m -- see brw_trimble.py
+rbr['wl'] = rbr['water_depth'] + (1.25 - rbr['water_depth'][0])
+
+n9497645 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/noaa/gpsn9497645.nc')
+# https://dggs.alaska.gov/hazards/coastal/ak-tidal-datum-portal.html
+# https://dggs.alaska.gov/hazards/coastal/download/202312_reference_table.pdf
+n9497645['wl'] = n9497645['v'] - np.mean([-0.971, -0.925]) # this is the mean of two OPUS/datum analysis values
+
 # %%
 camera = 'cx'
-product = 'snap'
+product = 'bright'
 
-extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/brw_extrinsic_c1.json',
-                       '/Users/dnowacki/Projects/ak/py/brw_extrinsic_c2.json',]
-intrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/brw_intrinsic_c1.json',
-                       '/Users/dnowacki/Projects/ak/py/brw_intrinsic_c2.json',]
+extrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/brw_extrinsic_c1.json',
+                       '/Users/dnowacki/projects/ak/py/brw_extrinsic_c2.json',]
+intrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/brw_intrinsic_c1.json',
+                       '/Users/dnowacki/projects/ak/py/brw_intrinsic_c2.json',]
 
 local_origin = {'x': 0,'y':0, 'angd': 0}
 
@@ -141,8 +152,8 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 # ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c1.'+ product + '.jpg')]
 # ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c2.' + product + '.jpg')]
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/*c2.' + product + '.jpg')]
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/17*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/17*c2.' + product + '.jpg')]
 
 if camera == 'c1':
     ts = ts1
@@ -183,6 +194,16 @@ ts = tsnew
 
 print('***', len(ts))
 print(product, camera)
+
+wl = {}
+for t in ts:
+    try:
+        wl[t] = n9497645.wl.sel(time=pd.to_datetime(t, unit='s'), method='nearest', tolerance='15min').values
+        # wl[t] = rbr.wl.sel(time=pd.to_datetime(t, unit='s'), method='nearest', tolerance='15min').values
+    except KeyError:
+        print('no wl for t=', t)
+        wl[t] = 1
+
 # %%
 print(product, camera)
 # t = ts[0]
@@ -190,10 +211,27 @@ print(product, camera)
 Parallel(n_jobs=8)(
     delayed(lazyrun)(
         metadata, intrinsics_list, extrinsics_list, local_origin, t,
-        1) # set z to 1, which is the approx water elevation from the beach survey
+        wl[t],
+        # 1, # set z to 1, which is the approx water elevation from the beach survey
+        )
         for t in ts
         )
-
+# %%
 
 # [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, 1) for t in ts]
-# [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts[0:2]]
+for t in ts:
+    print(t)
+    try:
+
+        lazyrun(metadata,
+            intrinsics_list,
+            extrinsics_list,
+            local_origin,
+            t,
+            wl[t],
+            # 1, # set z to 1, which is the approx water elevation from the beach survey
+        )
+    except KeyError:
+        print("No wl data for", pd.to_datetime(t, unit='s'))
+    except FileNotFoundError:
+        print("No file found for ", pd.to_datetime(t, unit='s'))
