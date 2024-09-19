@@ -73,7 +73,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     print(t)
 
     if np.isnan(z):
-        print("No wl data for", pd.to_datetime(t, unit='s'))
+        print("No wl data for", pd.to_datetime(int(t), unit='s'))
         return
     """ coordinate system setup"""
     if product == 'dark':
@@ -204,11 +204,15 @@ for t in ts:
         print('no wl for t=', t)
         wl[t] = 1
 
+# randomize ts
+import random
+random.shuffle(ts)
+
 # %%
 print(product, camera)
 # t = ts[0]
 # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values
-Parallel(n_jobs=8)(
+Parallel(n_jobs=10)(
     delayed(lazyrun)(
         metadata, intrinsics_list, extrinsics_list, local_origin, t,
         wl[t],
