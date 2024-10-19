@@ -140,7 +140,11 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         intrinsics_list = [intrinsics_list[0]]
         extrinsics_list = [extrinsics_list[0]]
 
-    rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
+    try:
+        rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
+    except FileNotFoundError:
+        print("could not find", image_files)
+        return
     ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
     print(ofile)
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
