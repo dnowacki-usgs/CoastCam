@@ -26,7 +26,7 @@ n9497645['wl'] = n9497645['v'] - np.mean([-0.971, -0.925]) # this is the mean of
 
 # %%
 camera = 'cx'
-product = 'bright'
+product = 'timex'
 
 extrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/brw_extrinsic_c1.json',
                        '/Users/dnowacki/projects/ak/py/brw_extrinsic_c2.json',]
@@ -156,8 +156,8 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 # ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c1.'+ product + '.jpg')]
 # ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c2.' + product + '.jpg')]
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/17*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/17*c2.' + product + '.jpg')]
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c2.' + product + '.jpg')]
 
 if camera == 'c1':
     ts = ts1
@@ -201,6 +201,7 @@ print(product, camera)
 
 wl = {}
 for t in ts:
+    print(t)
     try:
         wl[t] = n9497645.wl.sel(time=pd.to_datetime(t, unit='s'), method='nearest', tolerance='15min').values
         # wl[t] = rbr.wl.sel(time=pd.to_datetime(t, unit='s'), method='nearest', tolerance='15min').values
@@ -216,7 +217,7 @@ random.shuffle(ts)
 print(product, camera)
 # t = ts[0]
 # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values
-Parallel(n_jobs=10)(
+Parallel(n_jobs=8)(
     delayed(lazyrun)(
         metadata, intrinsics_list, extrinsics_list, local_origin, t,
         wl[t],

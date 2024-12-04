@@ -20,7 +20,7 @@ from joblib import Parallel, delayed
 
 # %%
 camera = 'cx'
-product = 'timex'
+product = 'bright'
 
 extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/extrinsic_c1.json',
                        '/Users/dnowacki/Projects/ak/py/extrinsic_c2.json',]
@@ -82,7 +82,8 @@ rectifier_grid = TargetGrid(
 
 rectifier = Rectifier(rectifier_grid)
 
-def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t):
+def lazyrun(inputs):
+    metadata, intrinsics_list, extrinsics_list, local_origin, t = inputs
     print(t)
     fildir = '/Volumes/Backstaff/field/bti/'
     if camera == 'cx':
@@ -115,6 +116,11 @@ elif camera == 'cx':
 
 # %%
 print(camera)
+import multiprocess as mp
+with mp.Pool() as pool:
+    result = pool.map(lazyrun, [(
+        metadata, intrinsics_list, extrinsics_list, local_origin, t) for t in ts])
 
-Parallel(n_jobs=4, backend='multiprocessing')(delayed(lazyrun)(metadata, intrinsics_list, extrinsics_list, local_origin, t) for t in ts)
+
+# Parallel(n_jobs=4, backend='multiprocessing')(delayed(lazyrun)(metadata, intrinsics_list, extrinsics_list, local_origin, t) for t in ts)
 # [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t) for t in ts]

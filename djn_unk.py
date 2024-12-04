@@ -17,7 +17,7 @@ from tqdm import tqdm
 import multiprocess as mp
 
 n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
-
+# n9468333.sel(time=slice('2024-01-01', '2024-09-01')).water_level.plot()
 # %%
 fildir = '/Volumes/Argus/unk/'
 camera = 'cx'
@@ -148,8 +148,8 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 # ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c1.'+ product + '.jpg')]
 # ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c2.' + product + '.jpg')]
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/*c2.' + product + '.jpg')]
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/170*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/170*c2.' + product + '.jpg')]
 
 if camera == 'c1':
     ts = ts1
@@ -195,17 +195,18 @@ print(product, camera)
 # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values
 
 ds = xr.Dataset()
-ds['time'] = xr.DataArray(pd.to_datetime(ts, unit='s'), dims='time')
+ds['time'] = xr.DataArray(pd.to_datetime([int(x) for x in ts], unit='s'), dims='time')
 ds['timestamp'] = xr.DataArray(ts, dims='time')
 ds['wl'] = n9468333['water_level'].reindex_like(ds['time'], method='nearest', tolerance='10min')
 ds = ds.sortby('time')
 
-# Parallel(n_jobs=-4)(
-#     delayed(lazyrun)(
-#         metadata, intrinsics_list, extrinsics_list, local_origin, t,
-#         ds['wl'][ds.timestamp == t].values)
-#         for t in ts
-#         )
+Parallel(n_jobs=-4)(
+    delayed(lazyrun)(
+        metadata, intrinsics_list, extrinsics_list, local_origin, t,
+        ds['wl'][ds.timestamp == t].values)
+        for t in ts
+        )
+# %%
 def multi_run_wrapper(args):
    return lazyrun(*args)
 
@@ -213,14 +214,33 @@ tasks = [(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][
 with mp.Pool(mp.cpu_count()-4) as pool:
     for _ in tqdm(pool.imap_unordered(multi_run_wrapper, tasks), total=len(tasks)):
         pass
-
-# with mp.Pool() as pool:
-#     result = pool.map(lazyrun, [(
-#         metadata, intrinsics_list, extrinsics_list, local_origin, t,
-#         n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts])
 # %%
-[lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values) for t in ts]
+with mp.Pool() as pool:
+    result = pool.starmap(lazyrun, [(
+        metadata, intrinsics_list, extrinsics_list, local_origin, t,
+        ds['wl'][ds.timestamp == t].values) for t in ts])
+# %%
+[lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values) for t in tqdm(ts)]
+# %%
+t = ts[-1]
+rectifier = lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values)
 
+tg = TargetGrid([0, 0], [65, 180], .5, .5, 1.1)
+
+# PIX file is U, V on each line
+# this line is lines 721-1181, 460 elements at 0.25 m spacing
+rectifier = Rectifier(TargetGrid([65, 180-.25], [0,0], .25, .25, 1.1))
+print(calibration)
+U, V, flag = rectifier._find_distort_UV(calibration)
+print(V[0][-5:])
+print(U[0][:5])
+V.shape
+U
+plt.plot(U.T)
+plt.plot(V.T)
+plt.colorbar()
+dir(rectifier)
+# %%
 # [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts[0:2]]
 # %%
 plt.plot(pd.to_datetime([x.split('/')[-1].split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/proc/rect/' + product + '/*png')], unit='s'),
