@@ -28,6 +28,9 @@ fildir = '/Volumes/Argus/glv/'
 n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
 n9468333['wl'] = n9468333['water_level']
 
+USE_GNSS = True
+gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/glv0_model2.nc')
+
 # %%
 camera = 'cx'
 product = 'snap'
@@ -150,7 +153,10 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     except FileNotFoundError:
         print("could not find", image_files)
         return
-    ofile = fildir + 'rect/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.' + camera + '.' + product + '.png'
+    if USE_GNSS:
+        ofile = fildir + 'rect/gnssr/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.' + camera + '.' + product + '.png'
+    else:
+        ofile = fildir + 'rect/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.' + camera + '.' + product + '.png'
     print(ofile)
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
 
@@ -208,7 +214,10 @@ print(product, camera)
 ds = xr.Dataset()
 ds['time'] = xr.DataArray(pd.to_datetime([int(x) for x in ts], unit='s'), dims='time')
 ds['timestamp'] = xr.DataArray(ts, dims='time')
-ds['wl'] = n9468333['water_level'].reindex_like(ds['time'], method='nearest', tolerance='10min')
+if USE_GNSS is True:
+    ds['wl'] = gnss['wl'].reindex_like(ds['time'], method='nearest', tolerance='60min')
+else:
+    ds['wl'] = n9468333['water_level'].reindex_like(ds['time'], method='nearest', tolerance='10min')
 ds = ds.sortby('time')
 
 # randomize ts
