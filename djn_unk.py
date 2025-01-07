@@ -15,9 +15,27 @@ from joblib import Parallel, delayed
 import xarray as xr
 from tqdm import tqdm
 import multiprocess as mp
+import scipy.signal as spsig
 
 n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
 # n9468333.sel(time=slice('2024-01-01', '2024-09-01')).water_level.plot()
+sttmp = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/awlw/station_134494_flat.nc')
+stm = xr.Dataset()
+stm['time'] = xr.DataArray(sttmp['time'].values, dims='time')
+stm['value'] = xr.DataArray(sttmp.value_1121869.values, dims='time')
+stm['wl'] = xr.DataArray(spsig.medfilt(stm['value'] + 0.84, 5), dims='time') # visual offset
+USE_GNSS=True
+# n9468333.water_level.plot()
+# filtered = spsig.medfilt(stm.value+.84, 5)
+# plt.plot(stm.time, filtered)
+# filtered.shape
+# plt.ylim(-1,3)
+# plt.xlim(pd.Timestamp('2024-09-01'), pd.Timestamp('2024-09-15'))
+#
+# plt.show()
+#
+# plt.plot(n9468333.water_level.reindex_like(stm, method='nearest', tolerance='15min',), filtered)
+# plt.plot([0, 4], [0, 4])
 # %%
 fildir = '/Volumes/Argus/unk/'
 camera = 'cx'
@@ -136,6 +154,10 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
     rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
     ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
+    if USE_GNSS:
+        ofile = fildir + 'proc/rect/gnssr/' + product + '/' + t + '.' + camera + '.' + product + '.png'
+    else:
+        ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
     print(ofile)
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
 
@@ -148,8 +170,8 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 # ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c1.'+ product + '.jpg')]
 # ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c2.' + product + '.jpg')]
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/170*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/170*c2.' + product + '.jpg')]
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1711*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1711*c2.' + product + '.jpg')]
 
 if camera == 'c1':
     ts = ts1
@@ -158,14 +180,17 @@ elif camera == 'c2':
 elif camera == 'cx':
     ts = list(set(ts1) | set(ts2)) # use OR instead of AND so we can have rectified images when just one camera was active
 
-
-with open(fildir + 'proc/rect/' + product + '/done.txt', 'w') as f:
-    for g in glob.glob(fildir + 'proc/rect/' + product + '/*png'):
+if USE_GNSS:
+    shim = 'gnssr/'
+else:
+    shim = ''
+with open(fildir + 'proc/rect/' + shim + product + '/done.txt', 'w') as f:
+    for g in glob.glob(fildir + 'proc/rect/' + shim + product + '/*png'):
         f.write(f"{g.split('/')[-1].split('.')[0]}\n")
-    for g in glob.glob(fildir + 'proc/rect/' + product + '/dark/*png'):
+    for g in glob.glob(fildir + 'proc/rect/' + shim + product + '/dark/*png'):
         f.write(f"{g.split('/')[-1].split('.')[0]}\n")
 
-with open(fildir + 'proc/rect/' + product + '/done.txt') as f:
+with open(fildir + 'proc/rect/' + shim + product + '/done.txt') as f:
     tsdone = [line.rstrip() for line in f]
 
 # this will get what remains to be done
@@ -197,7 +222,10 @@ print(product, camera)
 ds = xr.Dataset()
 ds['time'] = xr.DataArray(pd.to_datetime([int(x) for x in ts], unit='s'), dims='time')
 ds['timestamp'] = xr.DataArray(ts, dims='time')
-ds['wl'] = n9468333['water_level'].reindex_like(ds['time'], method='nearest', tolerance='10min')
+if USE_GNSS:
+    ds['wl'] = stm['wl'].reindex_like(ds['time'], method='nearest', tolerance='15min')
+else:
+    ds['wl'] = n9468333['water_level'].reindex_like(ds['time'], method='nearest', tolerance='10min')
 ds = ds.sortby('time')
 
 Parallel(n_jobs=-4)(
