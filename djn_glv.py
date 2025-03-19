@@ -11,26 +11,15 @@ from rectifier_crs import Rectifier, TargetGrid
 import pandas as pd
 from joblib import Parallel, delayed
 import xarray as xr
+import supportfunctions
 fildir = '/Volumes/Argus/glv/'
-
-
-# water level for 2021 data
-# rbr = xr.load_dataset('/Users/dnowacki/Library/CloudStorage/OneDrive-DOI/Alaska/brw2021/rbr/041230_20211007_2113/wave_interval_512/brwrbrs-a.nc')
-# waterlevel during wave gauge deployment 1.25 m -- see brw_trimble.py
-# rbr['wl'] = rbr['water_depth'] + (1.25 - rbr['water_depth'][0])
-
-# n9497645 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/noaa/gpsn9497645.nc')
-# https://dggs.alaska.gov/hazards/coastal/ak-tidal-datum-portal.html
-# https://dggs.alaska.gov/hazards/coastal/download/202312_reference_table.pdf
-# n9497645['wl'] = n9497645['v'] - np.mean([-0.971, -0.925]) # this is the mean of two OPUS/datum analysis values
-
 
 n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
 n9468333['wl'] = n9468333['water_level']
 
 USE_GNSS = True
 gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/glv0_model2.nc')
-
+beachtopo = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/glv/beachtopo_interp_to_argus.nc')
 # %%
 camera = 'cx'
 product = 'snap'
@@ -80,7 +69,7 @@ print(calibration.local_extrinsics)
 def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     print(t)
 
-    if np.isnan(z):
+    if np.all(np.isnan(z)):
         print("No wl data for", pd.to_datetime(int(t), unit='s'))
         return
     """ coordinate system setup"""
@@ -179,13 +168,17 @@ elif camera == 'cx':
 
 ts  = [x for x in ts if int(x) >= 1630294200 ] # only good images from when the camera was aimed correctly
 
-with open(fildir + 'rect/' + product + '/done.txt', 'w') as f:
-    for g in glob.glob(fildir + 'rect/' + product + '/*png'):
+if USE_GNSS:
+    shim = 'gnssr/'
+else:
+    shim = ''
+with open(fildir + 'rect/' + shim + product + '/done.txt', 'w') as f:
+    for g in glob.glob(fildir + 'rect/' + shim + product + '/*png'):
         f.write(f"{g.split('/')[-1].split('.')[0]}\n")
-    for g in glob.glob(fildir + 'rect/' + product + '/dark/*png'):
+    for g in glob.glob(fildir + 'rect/' + shim + product + '/dark/*png'):
         f.write(f"{g.split('/')[-1].split('.')[0]}\n")
 
-with open(fildir + 'rect/' + product + '/done.txt') as f:
+with open(fildir + 'rect/' + shim + product + '/done.txt') as f:
     tsdone = [line.rstrip() for line in f]
 
 # this will get what remains to be done
@@ -228,25 +221,33 @@ random.shuffle(ts)
 print(product, camera)
 # t = ts[0]
 # n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values
-Parallel(n_jobs=-4)(
+Parallel(n_jobs=-8)(
     delayed(lazyrun)(
         metadata, intrinsics_list, extrinsics_list, local_origin, t,
-        ds['wl'][ds.timestamp == t].values)
+        # beachtopo.scalars.where(~beachtopo.scalars.isnull(), ds['wl'][ds.timestamp == t].values)
+        # beachtopo.scalars.where(~beachtopo.scalars.isnull(), ds['wl'][ds.timestamp == t].values).where(z > ds['wl'][ds.timestamp == t].values, ds['wl'][ds.timestamp == t].values).values
+        ds['wl'][ds.timestamp == t].values
+        )
         for t in ts
         )
 # %%
 
 # [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, 1) for t in ts]
-for t in ts[0:2]:
+for t in ts:
     print(t)
     try:
-
+        if np.isnan(ds['wl'][ds.timestamp == t].values):
+            z = np.nan
+        else:
+            # z = beachtopo.scalars.where(~beachtopo.scalars.isnull(), ds['wl'][ds.timestamp == t].values).where(z > ds['wl'][ds.timestamp == t].values, ds['wl'][ds.timestamp == t].values).values
+            z = ds['wl'][ds.timestamp == t].values
+            # apply the WL where it is greater than beachtopo or where nans are
         lazyrun(metadata,
             intrinsics_list,
             extrinsics_list,
             local_origin,
             t,
-            ds['wl'][ds.timestamp == t].values
+            z
             # 1, # set z to 1, which is the approx water elevation from the beach survey
         )
     except KeyError:
