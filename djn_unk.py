@@ -4,9 +4,7 @@ import imageio
 import numpy as np
 import glob
 import os
-# %matplotlib inline
 import skimage.io
-import matplotlib.pyplot as plt
 from coastcam_funcs import json2dict
 from calibration_crs import CameraCalibration
 from rectifier_crs import Rectifier, TargetGrid
@@ -14,7 +12,7 @@ import pandas as pd
 from joblib import Parallel, delayed
 import xarray as xr
 from tqdm import tqdm
-import multiprocess as mp
+# import multiprocess as mp
 import scipy.signal as spsig
 
 n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
@@ -24,7 +22,12 @@ stm = xr.Dataset()
 stm['time'] = xr.DataArray(sttmp['time'].values, dims='time')
 stm['value'] = xr.DataArray(sttmp.value_1121869.values, dims='time')
 stm['wl'] = xr.DataArray(spsig.medfilt(stm['value'] + 0.84, 5), dims='time') # visual offset
-USE_GNSS=True
+
+USE_GNSS = True
+gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/unk0_model2.nc')
+USE_SPLINE = True
+gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/unk0_model2_spline.nc')
+
 # n9468333.water_level.plot()
 # filtered = spsig.medfilt(stm.value+.84, 5)
 # plt.plot(stm.time, filtered)
@@ -38,13 +41,14 @@ USE_GNSS=True
 # plt.plot([0, 4], [0, 4])
 # %%
 fildir = '/Volumes/Argus/unk/'
+fildir = 'd:' + fildir
 camera = 'cx'
 product = 'snap'
 
-extrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/unk_extrinsic_c1.json',
-                       '/Users/dnowacki/Projects/ak/py/unk_extrinsic_c2.json',]
-intrinsic_cal_files = ['/Users/dnowacki/Projects/ak/py/unk_intrinsic_c1.json',
-                       '/Users/dnowacki/Projects/ak/py/unk_intrinsic_c2.json',]
+extrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/unk_extrinsic_c1.json',
+                       '/Users/dnowacki/projects/ak/py/unk_extrinsic_c2.json',]
+intrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/unk_intrinsic_c1.json',
+                       '/Users/dnowacki/projects/ak/py/unk_intrinsic_c2.json',]
 
 local_origin = {'x': 0,'y':0, 'angd': 0}
 
@@ -83,18 +87,19 @@ print(calibration.world_extrinsics)
 print(calibration.local_extrinsics)
 
 def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
-    # metadata, intrinsics_list, extrinsics_list, local_origin, t, z = inputs
     print(t)
+
     if np.isnan(z):
-        print('*** NaN detected in Z; skipping ***')
+        print("No wl data for", pd.to_datetime(int(t), unit='s'))
         return
     """ coordinate system setup"""
+    dx = 0.1
+    dy = 0.1
+
     xmin = 0
     xmax = 250
     ymin = -150
     ymax = 40
-    dx = 0.1
-    dy = 0.1
     # z = 0 # z is now defined by water level input
     print(f'***Z: {z} m NAVD88')
     rectifier_grid = TargetGrid(
@@ -115,7 +120,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         # print(image_files)
         try:
             c1ref = skimage.io.imread(image_files[0])
-        except (AttributeError, ValueError):
+        except (AttributeError, ValueError, OSError):
             print('could not process', image_files[0], '; RETURNING')
             return
         except FileNotFoundError:
@@ -125,7 +130,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
         try:
             c2src = skimage.io.imread(image_files[1])
-        except (AttributeError, ValueError):
+        except (AttributeError, ValueError, OSError):
             print('could not process', image_files[1], '; RETURNING')
             return
         except FileNotFoundError:
@@ -153,9 +158,10 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         image_files = [image_files[0]]
 
     rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
-    ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
-    if USE_GNSS:
+    if USE_GNSS and not USE_SPLINE:
         ofile = fildir + 'proc/rect/gnssr/' + product + '/' + t + '.' + camera + '.' + product + '.png'
+    elif USE_GNSS and USE_SPLINE:
+        ofile = fildir + 'proc/rect/gnssr_spline/' + product + '/' + t + '.' + camera + '.' + product + '.png'
     else:
         ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
     print(ofile)
@@ -170,8 +176,8 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 # ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c1.'+ product + '.jpg')]
 # ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c2.' + product + '.jpg')]
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1711*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1711*c2.' + product + '.jpg')]
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c2.' + product + '.jpg')]
 
 if camera == 'c1':
     ts = ts1
@@ -180,15 +186,17 @@ elif camera == 'c2':
 elif camera == 'cx':
     ts = list(set(ts1) | set(ts2)) # use OR instead of AND so we can have rectified images when just one camera was active
 
-if USE_GNSS:
+if USE_GNSS and not USE_SPLINE:
     shim = 'gnssr/'
+elif USE_GNSS and USE_SPLINE:
+    shim = 'gnssr_spline/'
 else:
     shim = ''
 with open(fildir + 'proc/rect/' + shim + product + '/done.txt', 'w') as f:
     for g in glob.glob(fildir + 'proc/rect/' + shim + product + '/*png'):
-        f.write(f"{g.split('/')[-1].split('.')[0]}\n")
+        f.write(f"{g.split('/')[-1].split("\\")[-1].split('.')[0]}\n")
     for g in glob.glob(fildir + 'proc/rect/' + shim + product + '/dark/*png'):
-        f.write(f"{g.split('/')[-1].split('.')[0]}\n")
+        f.write(f"{g.split('/')[-1].split("\\")[-1].split('.')[0]}\n")
 
 with open(fildir + 'proc/rect/' + shim + product + '/done.txt') as f:
     tsdone = [line.rstrip() for line in f]
@@ -214,62 +222,54 @@ ts = tsnew
 
 print('***', len(ts))
 print(product, camera)
-# %%
-print(product, camera)
-# t = ts[0]
-# n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values
 
 ds = xr.Dataset()
 ds['time'] = xr.DataArray(pd.to_datetime([int(x) for x in ts], unit='s'), dims='time')
 ds['timestamp'] = xr.DataArray(ts, dims='time')
 if USE_GNSS:
-    ds['wl'] = stm['wl'].reindex_like(ds['time'], method='nearest', tolerance='15min')
+    ds['wl'] = gnss['wl'].reindex_like(ds['time'], method='nearest', tolerance='30min')
 else:
     ds['wl'] = n9468333['water_level'].reindex_like(ds['time'], method='nearest', tolerance='10min')
 ds = ds.sortby('time')
 
-Parallel(n_jobs=-4)(
-    delayed(lazyrun)(
-        metadata, intrinsics_list, extrinsics_list, local_origin, t,
-        ds['wl'][ds.timestamp == t].values)
-        for t in ts
-        )
-# %%
-def multi_run_wrapper(args):
-   return lazyrun(*args)
+import multiprocessing as mp
+def split_into_chunks(lst, chunk_size):
+    result = []
+    for i in range(0, len(lst), chunk_size):
+        result.append(lst[i:i + chunk_size])
+    return result
+    
+print(len(ts))
 
-tasks = [(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values) for t in ts]
-with mp.Pool(mp.cpu_count()-4) as pool:
-    for _ in tqdm(pool.imap_unordered(multi_run_wrapper, tasks), total=len(tasks)):
-        pass
-# %%
-with mp.Pool() as pool:
-    result = pool.starmap(lazyrun, [(
-        metadata, intrinsics_list, extrinsics_list, local_origin, t,
-        ds['wl'][ds.timestamp == t].values) for t in ts])
-# %%
-[lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values) for t in tqdm(ts)]
-# %%
-t = ts[-1]
-rectifier = lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values)
+if __name__ == '__main__':
+    for tsshort in split_into_chunks(ts, 200):
+        with mp.Pool(processes=10,maxtasksperchild=10) as pool:
+            result = pool.starmap(lazyrun, [(
+                metadata, intrinsics_list, extrinsics_list, local_origin, t,
+                ds['wl'][ds.timestamp == t].values) for t in tsshort])
+# # %%
+# [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values) for t in tqdm(ts)]
+# # %%
+# t = ts[-1]
+# rectifier = lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values)
 
-tg = TargetGrid([0, 0], [65, 180], .5, .5, 1.1)
+# tg = TargetGrid([0, 0], [65, 180], .5, .5, 1.1)
 
-# PIX file is U, V on each line
-# this line is lines 721-1181, 460 elements at 0.25 m spacing
-rectifier = Rectifier(TargetGrid([65, 180-.25], [0,0], .25, .25, 1.1))
-print(calibration)
-U, V, flag = rectifier._find_distort_UV(calibration)
-print(V[0][-5:])
-print(U[0][:5])
-V.shape
-U
-plt.plot(U.T)
-plt.plot(V.T)
-plt.colorbar()
-dir(rectifier)
-# %%
-# [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts[0:2]]
-# %%
-plt.plot(pd.to_datetime([x.split('/')[-1].split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/proc/rect/' + product + '/*png')], unit='s'),
-         marker='*')
+# # PIX file is U, V on each line
+# # this line is lines 721-1181, 460 elements at 0.25 m spacing
+# rectifier = Rectifier(TargetGrid([65, 180-.25], [0,0], .25, .25, 1.1))
+# print(calibration)
+# U, V, flag = rectifier._find_distort_UV(calibration)
+# print(V[0][-5:])
+# print(U[0][:5])
+# V.shape
+# U
+# plt.plot(U.T)
+# plt.plot(V.T)
+# plt.colorbar()
+# dir(rectifier)
+# # %%
+# # [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, n9468333['v'][np.argmin(np.abs(pd.DatetimeIndex(n9468333.time.values) - pd.to_datetime(t, unit='s')))].values) for t in ts[0:2]]
+# # %%
+# plt.plot(pd.to_datetime([x.split('/')[-1].split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/proc/rect/' + product + '/*png')], unit='s'),
+         # marker='*')
