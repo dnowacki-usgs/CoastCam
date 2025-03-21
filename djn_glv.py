@@ -30,7 +30,6 @@ USE_GNSS = True
 gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/glv0_model2.nc')
 USE_SPLINE = True
 gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/glv0_model2_spline.nc')
-
 # %%
 fildir = '/Volumes/Argus/glv/'
 fildir = 'd:' + fildir
@@ -82,7 +81,7 @@ print(calibration.local_extrinsics)
 def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     print(t)
 
-    if np.isnan(z):
+    if np.all(np.isnan(z)):
         print("No wl data for", pd.to_datetime(int(t), unit='s'))
         return
     """ coordinate system setup"""
@@ -225,7 +224,6 @@ ds = ds.sortby('time')
 # randomize ts
 import random
 random.shuffle(ts)
-
         
 import multiprocessing as mp
 def split_into_chunks(lst, chunk_size):
