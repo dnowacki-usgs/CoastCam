@@ -31,10 +31,17 @@ gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/glv0_model2.
 USE_SPLINE = True
 gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/glv0_model2_spline.nc')
 # %%
-fildir = '/Volumes/Argus/glv/'
-fildir = 'd:' + fildir
 camera = 'cx'
-product = 'snap'
+RAWIMAGES = True
+if RAWIMAGES:
+    fildir = '/Volumes/Argus/glv/RawImages/jpg1741548541513/'
+    product = ''
+else:
+    fildir = '/Volumes/Argus/glv/'
+    product = 'snap'
+# fildir = 'd:' + fildir
+
+
 
 extrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/glv_extrinsic_c1.json',
                        '/Users/dnowacki/projects/ak/py/glv_extrinsic_c2.json',]
@@ -107,13 +114,22 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     if camera == 'cx':
         c1bad = False
         c2bad = False
-        image_files = [fildir + 'products/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.c1.' + product + '.jpg',
-                       fildir + 'products/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.c2.' + product + '.jpg']
+        if RAWIMAGES:
+            image_files = [fildir + "c1_" + t + '.jpg',
+                           fildir + "c2_" + t + '.jpg']
+            # sometimes we are off by +/- 1 ms between the camera captures
+            if not os.path.isfile(image_files[1]):
+                image_files[1] = fildir + "c2_" + str(int(t)-1) + '.jpg'
+            if not os.path.isfile(image_files[1]):
+                image_files[1] = fildir + "c2_" + str(int(t)+1) + '.jpg'
+        else:
+            image_files = [fildir + 'products/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.c1.' + product + '.jpg',
+                           fildir + 'products/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.c2.' + product + '.jpg']
         # print(image_files)
         try:
             c1ref = skimage.io.imread(image_files[0])
-        except (AttributeError, ValueError, OSError):
-            print('could not process', image_files[0], '; RETURNING')
+        except (AttributeError, ValueError, OSError) as e:
+            print('could not process', image_files[0], '; RETURNING', e)
             return
         except FileNotFoundError:
             print('could not process', image_files[0], '; replacing with zeros')
@@ -122,7 +138,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
         try:
             c2src = skimage.io.imread(image_files[1])
-        except (AttributeError, ValueError, OSError):
+        except (AttributeError, ValueError, OSError) as e:
             print('could not process', image_files[1], '; RETURNING')
             return
         except FileNotFoundError:
@@ -150,12 +166,20 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         image_files = [image_files[0]]
 
     rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
-    if USE_GNSS and not USE_SPLINE:
-        ofile = fildir + 'rect/gnssr/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.' + camera + '.' + product + '.png'
-    elif USE_GNSS and USE_SPLINE:
-        ofile = fildir + 'rect/gnssr_spline/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.' + camera + '.' + product + '.png'
+    if RAWIMAGES:
+        if USE_GNSS and not USE_SPLINE:
+            ofile = fildir + 'rect/gnssr/' + product + '/' + t + '.' + camera + '.png'
+        elif USE_GNSS and USE_SPLINE:
+            ofile = fildir + 'rect/gnssr_spline/' + product + '/' + t + '.' + camera+ '.png'
+        else:
+            ofile = fildir + 'rect/' + product + '/' + t + '.' + camera + '.png'
     else:
-        ofile = fildir + 'rect/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.' + camera + '.' + product + '.png'
+        if USE_GNSS and not USE_SPLINE:
+            ofile = fildir + 'rect/gnssr/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.' + camera + '.' + product + '.png'
+        elif USE_GNSS and USE_SPLINE:
+            ofile = fildir + 'rect/gnssr_spline/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.' + camera + '.' + product + '.png'
+        else:
+            ofile = fildir + 'rect/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.' + camera + '.' + product + '.png'
     print(ofile)
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
 
@@ -165,8 +189,13 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
     return rectifier
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c2.' + product + '.jpg')]
+if RAWIMAGES:
+    ts1 = [os.path.basename(x).split('_')[1].split(".")[0] for x in glob.glob(fildir + "c1_*.jpg")]
+    ts2 = [os.path.basename(x).split('_')[1].split(".")[0] for x in glob.glob(fildir + "c2_*.jpg")]
+else:
+    ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c1.'+ product + '.jpg')]
+    ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c2.' + product + '.jpg')]
+
 
 if camera == 'c1':
     ts = ts1
@@ -175,12 +204,18 @@ elif camera == 'c2':
 elif camera == 'cx':
     ts = list(set(ts1) | set(ts2)) # use OR instead of AND so we can have rectified images when just one camera was active
 
+if RAWIMAGES:
+    # need to ensure we don't double count since sometimes the timestamps aren't exactly equivalent.
+    # We deal with these changes in the function.
+    ts = ts1
+
 if USE_GNSS and not USE_SPLINE:
     shim = 'gnssr/'
 elif USE_GNSS and USE_SPLINE:
     shim = 'gnssr_spline/'
 else:
     shim = ''
+os.makedirs(fildir + 'rect/' + shim + product, exist_ok=True)
 with open(fildir + 'rect/' + shim + product + '/done.txt', 'w') as f:
     for g in glob.glob(fildir + 'rect/' + shim + product + '/*png'):
         f.write(f"{g.split('/')[-1].split("\\")[-1].split('.')[0]}\n")
@@ -213,7 +248,10 @@ print('***', len(ts))
 print(product, camera)
 
 ds = xr.Dataset()
-ds['time'] = xr.DataArray(pd.to_datetime([int(x) for x in ts], unit='s'), dims='time')
+if RAWIMAGES:
+    ds['time'] = xr.DataArray(pd.to_datetime([int(x) for x in ts], unit='ms'), dims='time')
+else:
+    ds['time'] = xr.DataArray(pd.to_datetime([int(x) for x in ts], unit='s'), dims='time')
 ds['timestamp'] = xr.DataArray(ts, dims='time')
 if USE_GNSS:
     ds['wl'] = gnss['wl'].reindex_like(ds['time'], method='nearest', tolerance='60min')
@@ -224,14 +262,14 @@ ds = ds.sortby('time')
 # randomize ts
 import random
 random.shuffle(ts)
-        
+
 import multiprocessing as mp
 def split_into_chunks(lst, chunk_size):
     result = []
     for i in range(0, len(lst), chunk_size):
         result.append(lst[i:i + chunk_size])
     return result
-    
+
 print(len(ts))
 
 if __name__ == '__main__':
