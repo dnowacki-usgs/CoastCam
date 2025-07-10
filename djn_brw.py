@@ -148,17 +148,17 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
     rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
     if USE_GNSS and not USE_SPLINE:
-        ofile = fildir + 'proc/rect/gnssr/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.nuvuk') + '.' + camera + '.' + product + '.png'
+        ofile = fildir + 'rect/gnssr/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.nuvuk') + '.' + camera + '.' + product + '.png'
         # ofile = fildir + 'proc/rect/gnssr/' + product + '/' + t + '.' + camera + '.' + product + '.png'
     elif USE_GNSS and USE_SPLINE:
         # ofile = fildir + 'proc/rect/gnssr_spline/' + product + '/' + t + '.' + camera + '.' + product + '.png'
-        ofile = fildir + 'proc/rect/gnssr_spline/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.nuvuk') + '.' + camera + '.' + product + '.png'
+        ofile = fildir + 'rect/gnssr_spline/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.nuvuk') + '.' + camera + '.' + product + '.png'
     elif CONSTANT_WL:
         # ofile = fildir + 'proc/rect/constantwl/' + product + '/' + t + '.' + camera + '.' + product + '.png'
-        ofile = fildir + 'proc/rect/constantwl/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.nuvuk') + '.' + camera + '.' + product + '.png'
+        ofile = fildir + 'rect/constantwl/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.nuvuk') + '.' + camera + '.' + product + '.png'
     else:
         # ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
-        ofile = fildir + 'proc/rect/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.nuvuk') + '.' + camera + '.' + product + '.png'
+        ofile = fildir + 'rect/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.nuvuk') + '.' + camera + '.' + product + '.png'
     print(ofile)
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
 
@@ -188,13 +188,13 @@ else:
     shim = ''
 ts  = [x for x in ts if int(x) >= 1630294200 ] # only good images from when the camera was aimed correctly
 
-with open(fildir + 'proc/rect/' + shim + product + '/done.txt', 'w') as f:
-    for g in glob.glob(fildir + 'proc/rect/' + shim + product + '/*png'):
+with open(fildir + 'rect/' + shim + product + '/done.txt', 'w') as f:
+    for g in glob.glob(fildir + 'rect/' + shim + product + '/*png'):
         f.write(f"{g.split('/')[-1].split("\\")[-1].split('.')[0]}\n")
-    for g in glob.glob(fildir + 'proc/rect/' + shim + product + '/dark/*png'):
+    for g in glob.glob(fildir + 'rect/' + shim + product + '/dark/*png'):
         f.write(f"{g.split('/')[-1].split('.')[0]}\n")
 
-with open(fildir + 'proc/rect/' + shim + product + '/done.txt') as f:
+with open(fildir + 'rect/' + shim + product + '/done.txt') as f:
     tsdone = [line.rstrip() for line in f]
 
 # this will get what remains to be done
@@ -227,7 +227,7 @@ if USE_GNSS:
 elif CONSTANT_WL:
     ds['wl'] = xr.ones_like(ds.time).astype(float)
 else:
-    ds['wl'] = n9497645['water_level'].reindex_like(ds['time'], method='nearest', tolerance='10min')
+    ds['wl'] = n9497645['wl'].reindex_like(ds['time'], method='nearest', tolerance='10min')
 ds = ds.sortby('time')
 
 # randomize ts
@@ -240,7 +240,7 @@ def split_into_chunks(lst, chunk_size):
     for i in range(0, len(lst), chunk_size):
         result.append(lst[i:i + chunk_size])
     return result
-    
+
 print(len(ts))
 
 if __name__ == '__main__':
@@ -249,7 +249,7 @@ if __name__ == '__main__':
             result = pool.starmap(lazyrun, [(
                 metadata, intrinsics_list, extrinsics_list, local_origin, t,
                 ds['wl'][ds.timestamp == t].values) for t in tsshort])
-                
+
 # %%
 # print(product, camera)
 # # t = ts[0]
