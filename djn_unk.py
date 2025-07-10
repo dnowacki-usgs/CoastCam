@@ -15,7 +15,7 @@ from tqdm import tqdm
 # import multiprocess as mp
 import scipy.signal as spsig
 
-n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
+# n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
 # n9468333.sel(time=slice('2024-01-01', '2024-09-01')).water_level.plot()
 sttmp = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/awlw/station_134494_flat.nc')
 stm = xr.Dataset()
@@ -159,11 +159,14 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
     rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
     if USE_GNSS and not USE_SPLINE:
-        ofile = fildir + 'proc/rect/gnssr/' + product + '/' + t + '.' + camera + '.' + product + '.png'
+        # ofile = fildir + 'proc/rect/gnssr/' + product + '/' + t + '.' + camera + '.' + product + '.png'
+        ofile = fildir + 'proc/rect/gnssr/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.unalakleet') + '.' + camera + '.' + product + '.png'
     elif USE_GNSS and USE_SPLINE:
-        ofile = fildir + 'proc/rect/gnssr_spline/' + product + '/' + t + '.' + camera + '.' + product + '.png'
+        # ofile = fildir + 'proc/rect/gnssr_spline/' + product + '/' + t + '.' + camera + '.' + product + '.png'
+        ofile = fildir + 'proc/rect/gnssr_spline/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.unalakleet') + '.' + camera + '.' + product + '.png'
     else:
-        ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
+        # ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
+        ofile = fildir + 'proc/rect/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.unalakleet') + '.' + camera + '.' + product + '.png'
     print(ofile)
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
 

@@ -23,13 +23,11 @@ import xarray as xr
 # n9497645['wl'] = n9497645['v'] - np.mean([-0.971, -0.925]) # this is the mean of two OPUS/datum analysis values
 
 
-n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
-n9468333['wl'] = n9468333['water_level']
-
 USE_GNSS = True
 gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/glv0_model2.nc')
 USE_SPLINE = True
 gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/glv0_model2_spline.nc')
+CONSTANT_WL = False
 # %%
 camera = 'cx'
 RAWIMAGES = True
@@ -166,6 +164,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         image_files = [image_files[0]]
 
     rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
+
     if RAWIMAGES:
         if USE_GNSS and not USE_SPLINE:
             ofile = fildir + 'rect/gnssr/' + product + '/' + t + '.' + camera + '.png'
@@ -196,7 +195,6 @@ else:
     ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c1.'+ product + '.jpg')]
     ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c2.' + product + '.jpg')]
 
-
 if camera == 'c1':
     ts = ts1
 elif camera == 'c2':
@@ -213,6 +211,8 @@ if USE_GNSS and not USE_SPLINE:
     shim = 'gnssr/'
 elif USE_GNSS and USE_SPLINE:
     shim = 'gnssr_spline/'
+elif CONSTANT_WL:
+    shim = 'constantwl/'
 else:
     shim = ''
 os.makedirs(fildir + 'rect/' + shim + product, exist_ok=True)
@@ -255,7 +255,11 @@ else:
 ds['timestamp'] = xr.DataArray(ts, dims='time')
 if USE_GNSS:
     ds['wl'] = gnss['wl'].reindex_like(ds['time'], method='nearest', tolerance='60min')
+elif CONSTANT_WL:
+    ds['wl'] = 1.37 * xr.ones_like(ds.time).astype(float)    # using mean of GNSS-R values (model2)
 else:
+    n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
+    n9468333['wl'] = n9468333['water_level']
     ds['wl'] = n9468333['water_level'].reindex_like(ds['time'], method='nearest', tolerance='10min')
 ds = ds.sortby('time')
 
