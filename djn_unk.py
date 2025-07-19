@@ -9,11 +9,9 @@ from coastcam_funcs import json2dict
 from calibration_crs import CameraCalibration
 from rectifier_crs import Rectifier, TargetGrid
 import pandas as pd
-from joblib import Parallel, delayed
 import xarray as xr
-from tqdm import tqdm
-# import multiprocess as mp
 import scipy.signal as spsig
+import multiprocessing as mp
 
 # n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
 # n9468333.sel(time=slice('2024-01-01', '2024-09-01')).water_level.plot()
@@ -119,7 +117,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
                        fildir + 'products/' + t + '.c2.' + product + '.jpg']
         # print(image_files)
         try:
-            c1ref = skimage.io.imread(image_files[0])
+            skimage.io.imread(image_files[0])
         except (AttributeError, ValueError, OSError):
             print('could not process', image_files[0], '; RETURNING')
             return
@@ -129,7 +127,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
             c1bad = True
 
         try:
-            c2src = skimage.io.imread(image_files[1])
+            skimage.io.imread(image_files[1])
         except (AttributeError, ValueError, OSError):
             print('could not process', image_files[1], '; RETURNING')
             return
@@ -235,13 +233,13 @@ else:
     ds['wl'] = n9468333['water_level'].reindex_like(ds['time'], method='nearest', tolerance='10min')
 ds = ds.sortby('time')
 
-import multiprocessing as mp
+
 def split_into_chunks(lst, chunk_size):
     result = []
     for i in range(0, len(lst), chunk_size):
         result.append(lst[i:i + chunk_size])
     return result
-    
+
 print(len(ts))
 
 if __name__ == '__main__':
