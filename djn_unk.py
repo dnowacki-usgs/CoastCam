@@ -10,8 +10,8 @@ from calibration_crs import CameraCalibration
 from rectifier_crs import Rectifier, TargetGrid
 import pandas as pd
 import xarray as xr
-import scipy.signal as spsig
 import multiprocessing as mp
+import scipy.signal as spsig
 
 # n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
 # n9468333.sel(time=slice('2024-01-01', '2024-09-01')).water_level.plot()
