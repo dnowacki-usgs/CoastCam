@@ -19,12 +19,10 @@ site = "nuvuk"
 # waterlevel during wave gauge deployment 1.25 m -- see brw_trimble.py
 # rbr['wl'] = rbr['water_depth'] + (1.25 - rbr['water_depth'][0])
 
-n9497645 = xr.load_dataset("/Users/dnowacki/OneDrive - DOI/Alaska/noaa/gpsn9497645.nc")
+n9497645 = xr.open_mfdataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9497645*.nc')
 # https://dggs.alaska.gov/hazards/coastal/ak-tidal-datum-portal.html
 # https://dggs.alaska.gov/hazards/coastal/download/202312_reference_table.pdf
-n9497645["wl"] = n9497645["v"] - np.mean(
-    [-0.971, -0.925]
-)  # this is the mean of two OPUS/datum analysis values
+n9497645['wl'] = n9497645['water_level'] - np.mean([-0.971, -0.925]) # this is the mean of two OPUS/datum analysis values
 
 USE_GNSS = False
 gnss = xr.load_dataset("/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/brw1_model2.nc")
