@@ -13,6 +13,7 @@ import xarray as xr
 import multiprocessing as mp
 import scipy.signal as spsig
 
+site = 'unalakleet'
 # n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
 # n9468333.sel(time=slice('2024-01-01', '2024-09-01')).water_level.plot()
 sttmp = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/awlw/station_134494_flat.nc')
@@ -158,13 +159,16 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     rectified_image = rectifier.rectify_images(metadata, image_files, intrinsics_list, extrinsics_list, local_origin)
     if USE_GNSS and not USE_SPLINE:
         # ofile = fildir + 'proc/rect/gnssr/' + product + '/' + t + '.' + camera + '.' + product + '.png'
-        ofile = fildir + 'proc/rect/gnssr/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.unalakleet') + '.' + camera + '.' + product + '.png'
+        ofile = fildir + 'rect/gnssr/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.') + site + '.' + camera + '.' + product + '.png'
     elif USE_GNSS and USE_SPLINE:
         # ofile = fildir + 'proc/rect/gnssr_spline/' + product + '/' + t + '.' + camera + '.' + product + '.png'
-        ofile = fildir + 'proc/rect/gnssr_spline/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.unalakleet') + '.' + camera + '.' + product + '.png'
+        ofile = fildir + 'rect/gnssr_spline/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.') + site + '.' + camera + '.' + product + '.png'
+    elif CONSTANT_WL:
+        # ofile = fildir + 'proc/rect/constantwl/' + product + '/' + t + '.' + camera + '.' + product + '.png'
+        ofile = fildir + 'rect/constantwl/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.') + site + '.' + camera + '.' + product + '.png'
     else:
         # ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
-        ofile = fildir + 'proc/rect/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.unalakleet') + '.' + camera + '.' + product + '.png'
+        ofile = fildir + 'rect/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.') + site + '.' + camera + '.' + product + '.png'
     print(ofile)
     imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
 
@@ -174,11 +178,8 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
     return rectifier
 
-# ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c1.'+ product + '.jpg')]
-# ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob('/Volumes/Backstaff/field/unk/products/163[0-9][3-9][0-9][6-9]*c2.' + product + '.jpg')]
-
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1*c2.' + product + '.jpg')]
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/176*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/176*c2.' + product + '.jpg')]
 
 if camera == 'c1':
     ts = ts1
@@ -193,13 +194,13 @@ elif USE_GNSS and USE_SPLINE:
     shim = 'gnssr_spline/'
 else:
     shim = ''
-with open(fildir + 'proc/rect/' + shim + product + '/done.txt', 'w') as f:
-    for g in glob.glob(fildir + 'proc/rect/' + shim + product + '/*png'):
+with open(fildir + 'rect/' + shim + product + '/done.txt', 'w') as f:
+    for g in glob.glob(fildir + 'rect/' + shim + product + '/*png'):
         f.write(f"{g.split('/')[-1].split("\\")[-1].split('.')[0]}\n")
-    for g in glob.glob(fildir + 'proc/rect/' + shim + product + '/dark/*png'):
+    for g in glob.glob(fildir + 'rect/' + shim + product + '/dark/*png'):
         f.write(f"{g.split('/')[-1].split("\\")[-1].split('.')[0]}\n")
 
-with open(fildir + 'proc/rect/' + shim + product + '/done.txt') as f:
+with open(fildir + 'rect/' + shim + product + '/done.txt') as f:
     tsdone = [line.rstrip() for line in f]
 
 # this will get what remains to be done
@@ -242,17 +243,20 @@ def split_into_chunks(lst, chunk_size):
 
 print(len(ts))
 
+# so we don't waste time checking for water levels we know don't exist
+if USE_GNSS:
+    for t in ts:
+        if pd.Timestamp(int(t), unit="s") < gnss.time.min():
+            ts.remove(t)
+        if pd.Timestamp(int(t), unit="s") > gnss.time.max():
+            ts.remove(t)
+
 if __name__ == '__main__':
     for tsshort in split_into_chunks(ts, 200):
         with mp.Pool(processes=10,maxtasksperchild=10) as pool:
             result = pool.starmap(lazyrun, [(
                 metadata, intrinsics_list, extrinsics_list, local_origin, t,
                 ds['wl'][ds.timestamp == t].values) for t in tsshort])
-# # %%
-# [lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values) for t in tqdm(ts)]
-# # %%
-# t = ts[-1]
-# rectifier = lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, ds['wl'][ds.timestamp == t].values)
 
 # tg = TargetGrid([0, 0], [65, 180], .5, .5, 1.1)
 
