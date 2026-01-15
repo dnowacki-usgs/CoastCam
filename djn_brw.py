@@ -10,6 +10,8 @@ from calibration_crs import CameraCalibration
 from rectifier_crs import Rectifier, TargetGrid
 import pandas as pd
 import xarray as xr
+import multiprocessing as mp
+import random
 
 site = "nuvuk"
 # water level for 2021 data
@@ -117,9 +119,9 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         ]
         # print(image_files)
         try:
-            c1ref = skimage.io.imread(image_files[0])
-        except (AttributeError, ValueError, OSError) as e:
-            print("could not process", image_files[0], "; RETURNING", e)
+            skimage.io.imread(image_files[0])
+        except (AttributeError, ValueError, OSError):
+            print('could not process', image_files[0], '; RETURNING')
             return
         except FileNotFoundError:
             print("could not process", image_files[0], "; replacing with zeros")
@@ -127,7 +129,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
             c1bad = True
 
         try:
-            c2src = skimage.io.imread(image_files[1])
+            skimage.io.imread(image_files[1])
         except (AttributeError, ValueError, OSError):
             print("could not process", image_files[1], "; RETURNING")
             return
@@ -304,13 +306,12 @@ if USE_GNSS:
 elif CONSTANT_WL:
     ds["wl"] = xr.ones_like(ds.time).astype(float)
 else:
-    ds["wl"] = n9497645["wl"].reindex_like(
-        ds["time"], method="nearest", tolerance="10min"
-    )
-ds = ds.sortby("time")
+    ds['wl'] = n9497645['wl'].reindex_like(ds['time'], method='nearest', tolerance='10min')
+ds = ds.sortby('time')
 
-import multiprocessing as mp
+# randomize ts
 
+random.shuffle(ts)
 
 def split_into_chunks(lst, chunk_size):
     result = []

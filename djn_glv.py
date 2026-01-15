@@ -9,8 +9,9 @@ from coastcam_funcs import json2dict
 from calibration_crs import CameraCalibration
 from rectifier_crs import Rectifier, TargetGrid
 import pandas as pd
-from joblib import Parallel, delayed
 import xarray as xr
+import multiprocessing as mp
+import random
 
 # water level for 2021 data
 # rbr = xr.load_dataset('/Users/dnowacki/Library/CloudStorage/OneDrive-DOI/Alaska/brw2021/rbr/041230_20211007_2113/wave_interval_512/brwrbrs-a.nc')
@@ -125,7 +126,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
                            fildir + 'products/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.golovin') + '.c2.' + product + '.jpg']
         # print(image_files)
         try:
-            c1ref = skimage.io.imread(image_files[0])
+            skimage.io.imread(image_files[0])
         except (AttributeError, ValueError, OSError) as e:
             print('could not process', image_files[0], '; RETURNING', e)
             return
@@ -135,8 +136,8 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
             c1bad = True
 
         try:
-            c2src = skimage.io.imread(image_files[1])
-        except (AttributeError, ValueError, OSError) as e:
+            skimage.io.imread(image_files[1])
+        except (AttributeError, ValueError, OSError):
             print('could not process', image_files[1], '; RETURNING')
             return
         except FileNotFoundError:
@@ -264,10 +265,8 @@ else:
 ds = ds.sortby('time')
 
 # randomize ts
-import random
 random.shuffle(ts)
 
-import multiprocessing as mp
 def split_into_chunks(lst, chunk_size):
     result = []
     for i in range(0, len(lst), chunk_size):
