@@ -19,10 +19,14 @@ site = "nuvuk"
 # waterlevel during wave gauge deployment 1.25 m -- see brw_trimble.py
 # rbr['wl'] = rbr['water_depth'] + (1.25 - rbr['water_depth'][0])
 
-n9497645 = xr.open_mfdataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9497645*.nc')
+n9497645 = xr.open_mfdataset(
+    "/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9497645*.nc"
+)
 # https://dggs.alaska.gov/hazards/coastal/ak-tidal-datum-portal.html
 # https://dggs.alaska.gov/hazards/coastal/download/202312_reference_table.pdf
-n9497645['wl'] = n9497645['water_level'] - np.mean([-0.971, -0.925]) # this is the mean of two OPUS/datum analysis values
+n9497645["wl"] = n9497645["water_level"] - np.mean(
+    [-0.971, -0.925]
+)  # this is the mean of two OPUS/datum analysis values
 
 USE_GNSS = False
 gnss = xr.load_dataset("/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/brw1_model2.nc")
@@ -35,7 +39,7 @@ CONSTANT_WL = True
 fildir = "/Volumes/Argus/brw/"
 fildir = "d:" + fildir
 camera = "cx"
-product = "snap"
+product = "timex"
 
 extrinsic_cal_files = [
     "/Users/dnowacki/projects/ak/py/brw_extrinsic_c1.json",
@@ -119,7 +123,7 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         try:
             skimage.io.imread(image_files[0])
         except (AttributeError, ValueError, OSError):
-            print('could not process', image_files[0], '; RETURNING')
+            print("could not process", image_files[0], "; RETURNING")
             return
         except FileNotFoundError:
             print("could not process", image_files[0], "; replacing with zeros")
@@ -304,12 +308,15 @@ if USE_GNSS:
 elif CONSTANT_WL:
     ds["wl"] = xr.ones_like(ds.time).astype(float)
 else:
-    ds['wl'] = n9497645['wl'].reindex_like(ds['time'], method='nearest', tolerance='10min')
-ds = ds.sortby('time')
+    ds["wl"] = n9497645["wl"].reindex_like(
+        ds["time"], method="nearest", tolerance="10min"
+    )
+ds = ds.sortby("time")
 
 # randomize ts
 
 random.shuffle(ts)
+
 
 def split_into_chunks(lst, chunk_size):
     result = []
