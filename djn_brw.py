@@ -34,7 +34,7 @@ USE_SPLINE = False
 gnss = xr.load_dataset(
     "/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/brw1_model2_spline.nc"
 )
-CONSTANT_WL = True
+CONSTANT_WL = False
 # %%
 fildir = "/Volumes/Argus/brw/"
 fildir = "d:" + fildir
@@ -328,7 +328,7 @@ def split_into_chunks(lst, chunk_size):
 print(len(ts))
 
 if __name__ == "__main__":
-    for tsshort in split_into_chunks(ts, 200):
+    for tsshort in split_into_chunks(ts, 100):
         with mp.Pool(processes=10, maxtasksperchild=10) as pool:
             result = pool.starmap(
                 lazyrun,
