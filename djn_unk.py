@@ -12,10 +12,13 @@ import pandas as pd
 import xarray as xr
 import multiprocessing as mp
 import scipy.signal as spsig
+from PIL.PngImagePlugin import PngInfo
 
 site = 'unalakleet'
 # n9468333 = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333.nc')
 # n9468333.sel(time=slice('2024-01-01', '2024-09-01')).water_level.plot()
+n9468333 = xr.open_mfdataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/noaa/n9468333*.nc').load()
+
 sttmp = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/unk/awlw/station_134494_flat.nc')
 stm = xr.Dataset()
 stm['time'] = xr.DataArray(sttmp['time'].values, dims='time')
@@ -26,6 +29,7 @@ USE_GNSS = True
 gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/unk0_model2.nc')
 USE_SPLINE = True
 gnss = xr.load_dataset('/Users/dnowacki/OneDrive - DOI/Alaska/gnssr/unk0_model2_spline.nc')
+CONSTANT_WL = False
 
 # n9468333.water_level.plot()
 # filtered = spsig.medfilt(stm.value+.84, 5)
@@ -44,18 +48,37 @@ fildir = 'd:' + fildir
 camera = 'cx'
 product = 'snap'
 
-extrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/unk_extrinsic_c1.json',
-                       '/Users/dnowacki/projects/ak/py/unk_extrinsic_c2.json',]
-intrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/unk_intrinsic_c1.json',
-                       '/Users/dnowacki/projects/ak/py/unk_intrinsic_c2.json',]
 
-local_origin = {'x': 0,'y':0, 'angd': 0}
+# extrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/unk_extrinsic_c1.json',
+                       # '/Users/dnowacki/projects/ak/py/unk_extrinsic_c2.json',]
+# intrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/unk_intrinsic_c1.json',
+                       # '/Users/dnowacki/projects/ak/py/unk_intrinsic_c2.json',]
+
+intrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/unk_intrinsic_c1_2018.json',
+                       '/Users/dnowacki/projects/ak/py/unk_intrinsic_c2_2018.json',]
+
+extrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/unk_extrinsic_c1_2018.json',
+                       '/Users/dnowacki/projects/ak/py/unk_extrinsic_c2_2018.json',]
+                       
+extrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/unk_extrinsic_c1_2021_2023.json',
+                       '/Users/dnowacki/projects/ak/py/unk_extrinsic_c2_2021_2023.json',]
+
+extrinsic_cal_files = ['/Users/dnowacki/projects/ak/py/unk_extrinsic_c1_2024.json',
+                       '/Users/dnowacki/projects/ak/py/unk_extrinsic_c2_2024.json',]
+
+
+#local_origin = {'x': 0,'y':0, 'angd': 0}
+local_origin = {'x': 411796.89520781225, 'y': 7084426.541169372, 'angd': 195}
+# round to nearest whole meter
+local_origin = {'x': 411797, 'y': 7084427, 'angd': 195}
 
 metadata= {'name': 'UNK',
            'serial_number': 1,
            'camera_number': camera,
            'calibration_date': 'xxxx-xx-xx',
-           'coordinate_system': 'xyz'}
+           # 'coordinate_system': 'xyz'
+           'coordinate_system': 'geo'
+           }
 
 # read cal files and make lists of cal dicts
 extrinsics_list = []
@@ -84,6 +107,12 @@ calibration = CameraCalibration(metadata,intrinsics_list[0],extrinsics_list[0],l
 print(calibration.local_origin)
 print(calibration.world_extrinsics)
 print(calibration.local_extrinsics)
+
+pnginfo = PngInfo()
+pnginfo.add_text("intrinsic_cal_files", str(intrinsic_cal_files))
+pnginfo.add_text("extrinsic_cal_files", str(extrinsic_cal_files))
+pnginfo.add_text("intrinsics_list", str(intrinsics_list))
+pnginfo.add_text("extrinsics_list", str(extrinsics_list))
 
 def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
     print(t)
@@ -170,7 +199,11 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
         # ofile = fildir + 'proc/rect/' + product + '/' + t + '.' + camera + '.' + product + '.png'
         ofile = fildir + 'rect/' + product + '/' + t + pd.Timestamp(int(t), unit='s').strftime('.%a.%b.%d_%H_%M_%S.GMT.%Y.') + site + '.' + camera + '.' + product + '.png'
     print(ofile)
-    imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True)
+    pnginfo.add_text("z", str(z))
+    pnginfo.add_text("USE_GNSS", str(USE_GNSS))
+    pnginfo.add_text("USE_SPLINE", str(USE_SPLINE))
+    pnginfo.add_text("CONSTANT_WL", str(CONSTANT_WL))
+    imageio.imwrite(ofile, np.flip(rectified_image, 0), format='png', optimize=True, pnginfo=pnginfo)
 
     # rectified_image_matched = rectifier.rectify_images(metadata, [c1ref, c2matched], intrinsics_list, extrinsics_list, local_origin)
     # ofile = fildir + 'proc/rect/' + t + '.' + camera + '.' + product + '.rect.matched.png'
@@ -178,8 +211,16 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 
     return rectifier
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/176*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/176*c2.' + product + '.jpg')]
+# 15* will be all up to/including 2020 (so use 2018 calibration)
+#ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/15*c1.'+ product + '.jpg')]
+#ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/15*c2.' + product + '.jpg')]
+
+# 1[6-7]* 2021-2026
+#ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1[6-7]*c1.'+ product + '.jpg')]
+#ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1[6-7]*c2.' + product + '.jpg')]
+
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/17[3-9]*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/17[3-9]*c2.' + product + '.jpg')]
 
 if camera == 'c1':
     ts = ts1
