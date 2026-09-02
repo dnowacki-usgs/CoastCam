@@ -44,7 +44,7 @@ CONSTANT_WL = False
 # plt.plot([0, 4], [0, 4])
 # %%
 fildir = '/Volumes/Argus/unk/'
-fildir = 'd:' + fildir
+# fildir = 'd:' + fildir
 camera = 'cx'
 product = 'snap'
 
@@ -215,12 +215,14 @@ def lazyrun(metadata, intrinsics_list, extrinsics_list, local_origin, t, z):
 #ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/15*c1.'+ product + '.jpg')]
 #ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/15*c2.' + product + '.jpg')]
 
-# 1[6-7]* 2021-2026
-#ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1[6-7]*c1.'+ product + '.jpg')]
-#ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/1[6-7]*c2.' + product + '.jpg')]
+# 1[6-7]* 2021-2023 calibration use for all of 16*
+#ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/16*c1.'+ product + '.jpg')]
+#ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/16*c2.' + product + '.jpg')]
 
-ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/17[3-9]*c1.'+ product + '.jpg')]
-ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/17[3-9]*c2.' + product + '.jpg')]
+# 2024 calibration was in june 2024 but use it for all of 17* since that was november 14 2023 (close to 2024)
+# and open water wasn't until may 2024 ish anyway
+ts1 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/17*c1.'+ product + '.jpg')]
+ts2 = [os.path.basename(x).split('.')[0] for x in glob.glob(fildir + 'products/17*c2.' + product + '.jpg')]
 
 if camera == 'c1':
     ts = ts1
